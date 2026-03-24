@@ -100,13 +100,21 @@ service cloud.firestore {
              (!('region' in data) || (data.region is string && data.region.size() < 100)) &&
              (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
              (!('inn' in data) || (data.inn is string && data.inn.size() <= 20)) &&
+             (!('dateOfBirth' in data) || (data.dateOfBirth is string && data.dateOfBirth.size() <= 20)) &&
              (!('address' in data) || (data.address is string && data.address.size() <= 200)) &&
              (!('housingType' in data) || (data.housingType is string && data.housingType.size() <= 50)) &&
              (!('documents' in data) || (data.documents is list && data.documents.size() <= 10)) &&
              (!('projects' in data) || (data.projects is list && data.projects.size() <= 20)) &&
              (!('certificates' in data) || (data.certificates is list && data.certificates.size() <= 10)) &&
              (!('categories' in data) || (data.categories is list && data.categories.size() <= 10)) &&
-             (!('verificationStatus' in data) || data.verificationStatus in ['pending', 'verified', 'rejected']);
+             (!('verificationStatus' in data) || data.verificationStatus in ['pending', 'verified', 'rejected']) &&
+             (!('subscription' in data) || data.subscription in ['free', 'premium', 'pro']);
+    }
+    
+    function isUserUpdateValid() {
+      let isOwnerOrAdmin = isOwner(request.resource.data.uid) || isAdmin();
+      let restrictedFieldsUnchanged = isAdmin() || areImmutableFieldsUnchanged(['role', 'verificationStatus', 'subscription', 'rating', 'createdAt', 'uid']);
+      return isOwnerOrAdmin && restrictedFieldsUnchanged && isValidUser(request.resource.data);
     }
     
     function isValidRequest(data) {
@@ -147,10 +155,8 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
                     request.resource.data.uid == userId &&
-                    (request.resource.data.role in ['customer', 'supplier'] || isAdmin());
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
-                    areImmutableFieldsUnchanged(['uid', 'createdAt']) &&
-                    (areImmutableFieldsUnchanged(['role']) || isAdmin());
+                    (request.resource.data.role in ['consumer', 'developer', 'supplier'] || isAdmin());
+      allow update: if isUserUpdateValid();
       allow delete: if isAdmin();
     }
     

@@ -49,6 +49,7 @@ export default function OnboardingModal({ isOpen, user, onComplete }: Onboarding
 
       if (role === 'developer' || role === 'supplier') {
         updateData.companyName = companyName.trim();
+        updateData.verificationStatus = 'pending';
         if (inn.trim()) {
           updateData.inn = inn.trim();
         }

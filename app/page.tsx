@@ -55,9 +55,9 @@ export default function FeedPage() {
           <div className="p-6">
             <div className="flex items-center gap-2 mb-3">
               <span className="px-3 py-1 rounded-full bg-secondary text-white text-[10px] font-bold tracking-wider uppercase">Потребность</span>
-              <span className="text-xs text-slate-500 font-medium">2 часа назад • ООО "Монолит-М"</span>
+              <span className="text-xs text-slate-500 font-medium">2 часа назад • ООО &quot;Монолит-М&quot;</span>
             </div>
-            <h3 className="text-xl font-heading font-semibold leading-tight mb-2 text-secondary">Требуется поставка бетона М400 для ЖК "Северный Ветер"</h3>
+            <h3 className="text-xl font-heading font-semibold leading-tight mb-2 text-secondary">Требуется поставка бетона М400 для ЖК &quot;Северный Ветер&quot;</h3>
             <p className="text-slate-600 mb-4 text-sm">Объем 450 м³. График заливки с 15 по 20 число месяца. Рассматриваем поставщиков с собственным автопарком миксеров.</p>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-slate-500">
@@ -78,7 +78,7 @@ export default function FeedPage() {
               <span className="px-3 py-1 rounded-full bg-accent text-secondary text-[10px] font-bold tracking-wider uppercase">Предложение</span>
             </div>
             <h3 className="text-xl font-heading font-bold mb-3">Арматурная сталь со склада в Бишкеке</h3>
-            <p className="text-sm opacity-90 mb-6 italic">"Для поставщиков: лучшие условия на объем от 50 тонн"</p>
+            <p className="text-sm opacity-90 mb-6 italic">&quot;Для поставщиков: лучшие условия на объем от 50 тонн&quot;</p>
             <ul className="space-y-3 mb-8">
               <li className="flex items-center gap-2 text-sm font-medium">
                 <CheckCircle2 className="w-4 h-4 text-accent" /> А500С все диаметры
