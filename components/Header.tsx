@@ -7,15 +7,15 @@ import Image from 'next/image';
 
 export default function Header() {
   const pathname = usePathname();
-  const { user, openAuthModal } = useAuth();
+  const { user, userData, openAuthModal } = useAuth();
 
   return (
     <header className="flex justify-between items-center px-4 h-16 w-full sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-slate-200">
       <div className="flex items-center gap-3">
         {user ? (
           <Link href="/profile" className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden border border-primary/20 relative">
-            {user.photoURL ? (
-              <Image src={user.photoURL} alt={user.displayName || 'User'} fill className="object-cover" />
+            {userData?.photoURL ? (
+              <Image src={userData.photoURL} alt={userData?.name || 'User'} fill className="object-cover" />
             ) : (
               <User className="w-6 h-6 text-primary" />
             )}

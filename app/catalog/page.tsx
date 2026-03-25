@@ -2,8 +2,7 @@
 import { Search, MapPin, Grid, SlidersHorizontal, Star, BadgeCheck, MessageSquare, ChevronDown, Package, Briefcase, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { ProductCard } from '@/components/catalog/ProductCard';
 
 const CATEGORIES = {
@@ -62,67 +61,50 @@ export default function CatalogPage() {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const q = query(
-          collection(db, 'products'),
-          where('type', '==', activeTab),
-          where('isActive', '==', true)
-        );
-        const querySnapshot = await getDocs(q);
+        // Fetch products that match the active tab and are active
+        const { data: rawProducts, error: productsError } = await supabase
+          .from('products')
+          .select('*')
+          .eq('type', activeTab)
+          .eq('isActive', true);
 
-        // Optimization: Resolve N+1 problem by using Promise.all and caching supplier data
-        const supplierCache = new Map();
+        if (productsError) throw productsError;
+        if (!rawProducts) {
+          setProducts([]);
+          return;
+        }
 
-        const fetchedProducts = await Promise.all(
-          querySnapshot.docs.map(async (document) => {
-            const productData = document.data();
-            const supplierId = productData.supplierId;
+        // Extract unique supplier IDs
+        const supplierIds = Array.from(new Set(rawProducts.map(p => p.supplierId)));
 
-            let supplierName = 'Неизвестный поставщик';
-            let supplierVerified = false;
-            let supplierRating = 5.0;
-            let supplierReviewCount = 0;
-            let region = productData.region || 'Кыргызстан';
+        // Fetch suppliers matching the IDs
+        let suppliersMap = new Map();
+        if (supplierIds.length > 0) {
+          const { data: suppliers, error: suppliersError } = await supabase
+            .from('users')
+            .select('id, name, companyName, verificationStatus, rating, region')
+            .in('id', supplierIds);
 
-            try {
-              if (supplierCache.has(supplierId)) {
-                const cachedData = supplierCache.get(supplierId);
-                supplierName = cachedData.supplierName;
-                supplierVerified = cachedData.supplierVerified;
-                supplierRating = cachedData.supplierRating;
-                region = cachedData.region;
-              } else {
-                const supplierRef = doc(db, 'users', supplierId);
-                const supplierSnap = await getDoc(supplierRef);
-                if (supplierSnap.exists()) {
-                  const sData = supplierSnap.data();
-                  supplierName = sData.companyName || sData.name || supplierName;
-                  supplierVerified = sData.verificationStatus === 'verified';
-                  supplierRating = sData.rating || 5.0;
-                  region = sData.region || region;
+          if (!suppliersError && suppliers) {
+            suppliers.forEach(s => {
+              suppliersMap.set(s.id, s);
+            });
+          }
+        }
 
-                  supplierCache.set(supplierId, {
-                    supplierName,
-                    supplierVerified,
-                    supplierRating,
-                    region
-                  });
-                }
-              }
-            } catch (e) {
-              console.error("Error fetching supplier data:", e);
-            }
+        // Map products with their supplier data
+        const fetchedProducts = rawProducts.map(product => {
+          const sData = suppliersMap.get(product.supplierId);
 
-            return {
-              id: document.id,
-              ...productData,
-              supplierName,
-              supplierVerified,
-              supplierRating,
-              supplierReviewCount,
-              region
-            };
-          })
-        );
+          return {
+            ...product,
+            supplierName: sData?.companyName || sData?.name || 'Неизвестный поставщик',
+            supplierVerified: sData?.verificationStatus === 'verified',
+            supplierRating: sData?.rating || 5.0,
+            supplierReviewCount: 0,
+            region: sData?.region || product.region || 'Кыргызстан'
+          };
+        });
 
         setProducts(fetchedProducts);
       } catch (error) {
@@ -149,7 +131,7 @@ export default function CatalogPage() {
     switch (sortBy) {
       case 'price_asc': return a.price - b.price;
       case 'price_desc': return b.price - a.price;
-      case 'newest': return b.createdAt?.toMillis() - a.createdAt?.toMillis();
+      case 'newest': return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       case 'rating':
       default:
         return b.supplierRating - a.supplierRating;

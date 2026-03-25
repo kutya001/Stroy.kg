@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Phone, ShieldCheck, Loader2, ArrowRight, Mail, Lock } from 'lucide-react';
-import { auth } from '@/lib/firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { supabase } from '@/lib/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -24,25 +23,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [timer, setTimer] = useState(300); // 5 minutes TTL
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-
-  // Initialize Recaptcha
-  useEffect(() => {
-    if (isOpen && !recaptchaVerifierRef.current && recaptchaContainerRef.current) {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
-        size: 'invisible',
-        callback: () => {
-          // reCAPTCHA solved
-        },
-        'expired-callback': () => {
-          setError('Срок действия капчи истек. Пожалуйста, попробуйте снова.');
-        }
-      });
-    }
-  }, [isOpen]);
 
   // Timer logic
   useEffect(() => {
@@ -74,25 +54,19 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setError('');
 
     try {
-      // Format phone number (assuming Kyrgyzstan +996 or similar, user should enter full format)
-      // For simplicity, we expect the user to enter the full number with +
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
       
-      if (!recaptchaVerifierRef.current) throw new Error('Recaptcha not initialized');
+      const { error: signInError } = await supabase.auth.signInWithOtp({
+        phone: formattedPhone,
+      });
 
-      const result = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifierRef.current);
-      setConfirmationResult(result);
+      if (signInError) throw signInError;
+
       setStep('otp');
       setTimer(300);
     } catch (err: any) {
       console.error('SMS Error:', err);
       setError(err.message || 'Ошибка отправки SMS. Проверьте номер.');
-      // Reset recaptcha on error
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.render().then(widgetId => {
-          (window as any).grecaptcha.reset(widgetId);
-        });
-      }
     } finally {
       setLoading(false);
     }
@@ -109,11 +83,17 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setError('');
 
     try {
-      if (!confirmationResult) throw new Error('Нет сессии подтверждения');
-      await confirmationResult.confirm(otp);
-      // Success! AuthProvider will catch the state change
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: otp,
+        type: 'sms',
+      });
+
+      if (verifyError) throw verifyError;
+
       onClose();
-      // Reset state
       setTimeout(() => {
         setStep('phone');
         setPhoneNumber('');
@@ -143,11 +123,21 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setError('');
 
     try {
+      let result;
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        result = await supabase.auth.signUp({
+          email,
+          password,
+        });
       }
+
+      if (result.error) throw result.error;
+
       onClose();
       setTimeout(() => {
         setEmail('');
@@ -156,14 +146,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       }, 500);
     } catch (err: any) {
       console.error('Email Auth Error:', err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      if (err.message.includes('Invalid login credentials')) {
         setError('Неверный email или пароль');
-      } else if (err.code === 'auth/email-already-in-use') {
+      } else if (err.message.includes('already registered')) {
         setError('Этот email уже используется');
-      } else if (err.code === 'auth/weak-password') {
+      } else if (err.message.includes('Password should be at least')) {
         setError('Пароль должен быть не менее 6 символов');
       } else {
-        setError('Произошла ошибка. Попробуйте позже.');
+        setError(err.message || 'Произошла ошибка. Попробуйте позже.');
       }
     } finally {
       setLoading(false);
@@ -335,8 +325,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 </span>
               </label>
 
-              <div id="recaptcha-container" ref={recaptchaContainerRef}></div>
-
               <button
                 type="submit"
                 disabled={!agreed || loading || !phoneNumber}
@@ -358,7 +346,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-heading font-bold text-center text-2xl tracking-widest"
                 />
                 <p className="text-xs text-slate-500 text-center mt-2">
-                  Firebase отправляет 6-значный код
+                  Введите 6-значный код из SMS
                 </p>
               </div>
 

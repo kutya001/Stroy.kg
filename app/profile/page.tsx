@@ -71,16 +71,16 @@ export default function ProfilePage() {
           </div>
         )}
         <div className="w-24 h-24 rounded-full bg-slate-100 relative overflow-hidden border-4 border-white shadow-md shrink-0">
-          {user.photoURL ? (
-            <Image src={user.photoURL} alt={user.displayName || 'User'} fill className="object-cover" />
+          {userData.photoURL ? (
+            <Image src={userData.photoURL} alt={userData.name || 'User'} fill className="object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold text-2xl">
-              {user.phoneNumber ? user.phoneNumber.slice(-2) : 'U'}
+              {user.phone ? user.phone.slice(-2) : 'U'}
             </div>
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-heading font-bold text-secondary mb-1 truncate">{userData?.name || user.phoneNumber}</h2>
+          <h2 className="text-2xl font-heading font-bold text-secondary mb-1 truncate">{userData?.name || user.phone}</h2>
           <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mb-3">
             {(userData?.role === 'developer' || userData?.role === 'supplier') && (
               <div className="flex items-center gap-1">
@@ -241,7 +241,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <span className="font-medium text-secondary block">Номер телефона</span>
-              <span className="text-xs text-slate-500">{user.phoneNumber || 'Не указан'}</span>
+              <span className="text-xs text-slate-500">{user.phone || 'Не указан'}</span>
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-400" />
