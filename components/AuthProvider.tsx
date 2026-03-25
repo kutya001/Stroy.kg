@@ -49,11 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           // Create new user profile with onboardingCompleted: false
+          // Use admin role for the specific email
+          const isAdmin = currentUser.email === 'kutmanomuraliev012@gmail.com';
           const newUserData = {
             uid: currentUser.uid,
-            name: currentUser.phoneNumber || 'Пользователь',
-            email: '',
-            role: 'consumer', // Default role, will be updated in onboarding
+            name: currentUser.phoneNumber || currentUser.email?.split('@')[0] || 'Пользователь',
+            email: currentUser.email || '',
+            role: isAdmin ? 'admin' : 'consumer', // Default role, will be updated in onboarding
             onboardingCompleted: false,
             createdAt: serverTimestamp(),
           };

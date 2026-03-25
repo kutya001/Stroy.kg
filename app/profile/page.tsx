@@ -5,11 +5,14 @@ import { useAuth } from '@/components/AuthProvider';
 import { useState } from 'react';
 import ChangePhoneModal from '@/components/ChangePhoneModal';
 import ProfileEditor from '@/components/ProfileEditor';
+import ChangePasswordModal from '@/components/ChangePasswordModal';
+import { Lock } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, userData, logout, openAuthModal } = useAuth();
   const [isChangingPhone, setIsChangingPhone] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   if (!user) {
     return (
@@ -244,6 +247,35 @@ export default function ProfilePage() {
           <ChevronRight className="w-5 h-5 text-slate-400" />
         </div>
 
+        {/* Password Change (for users signed in with email) */}
+        {(userData?.role === 'admin' || user.email) && (
+          <div
+            onClick={() => setIsChangingPassword(true)}
+            className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                <Lock className="w-5 h-5" />
+              </div>
+              <span className="font-medium text-secondary">Изменить пароль</span>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400" />
+          </div>
+        )}
+
+        {/* Admin Dashboard */}
+        {userData?.role === 'admin' && (
+          <a href="/admin" className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-colors block">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Shield className="w-5 h-5" />
+              </div>
+              <span className="font-medium text-secondary">Панель администратора</span>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400" />
+          </a>
+        )}
+
         <div className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-colors">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
@@ -289,6 +321,7 @@ export default function ProfilePage() {
       </button>
 
       <ChangePhoneModal isOpen={isChangingPhone} onClose={() => setIsChangingPhone(false)} />
+      <ChangePasswordModal isOpen={isChangingPassword} onClose={() => setIsChangingPassword(false)} />
       
       {isEditingProfile && (
         <ProfileEditor 
