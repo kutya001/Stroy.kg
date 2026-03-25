@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { X, User, Briefcase, Truck, Loader2 } from 'lucide-react';
 
 interface OnboardingModalProps {
@@ -40,7 +39,6 @@ export default function OnboardingModal({ isOpen, user, onComplete }: Onboarding
     setError('');
 
     try {
-      const userRef = doc(db, 'users', user.uid);
       const updateData: any = {
         role,
         name: name.trim(),
@@ -55,7 +53,13 @@ export default function OnboardingModal({ isOpen, user, onComplete }: Onboarding
         }
       }
 
-      await updateDoc(userRef, updateData);
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('uid', user.id || user.uid);
+
+      if (updateError) throw updateError;
+
       onComplete(updateData);
     } catch (err: any) {
       console.error('Error updating profile:', err);

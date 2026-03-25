@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { Shield, CheckCircle, XCircle, Loader2, Building2, User, FileText } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -25,16 +24,13 @@ export default function AdminPage() {
       if (!userData || userData.role !== 'admin') return;
 
       try {
-        const q = query(
-          collection(db, 'users'),
-          where('verificationStatus', '==', 'pending')
-        );
-        const querySnapshot = await getDocs(q);
-        const users: any[] = [];
-        querySnapshot.forEach((doc) => {
-          users.push({ id: doc.id, ...doc.data() });
-        });
-        setPendingUsers(users);
+        const { data: users, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('verificationStatus', 'pending');
+
+        if (error) throw error;
+        setPendingUsers(users || []);
       } catch (error) {
         console.error("Error fetching pending users:", error);
       } finally {
@@ -50,10 +46,12 @@ export default function AdminPage() {
   const handleUpdateStatus = async (userId: string, newStatus: 'verified' | 'rejected') => {
     setActionLoading(userId);
     try {
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
-        verificationStatus: newStatus
-      });
+      const { error } = await supabase
+        .from('users')
+        .update({ verificationStatus: newStatus })
+        .eq('id', userId);
+
+      if (error) throw error;
       setPendingUsers(prev => prev.filter(u => u.id !== userId));
     } catch (error) {
       console.error(`Error updating user status to ${newStatus}:`, error);

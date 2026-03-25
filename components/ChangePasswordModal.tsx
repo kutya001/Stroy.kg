@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Lock, Loader2 } from 'lucide-react';
-import { updatePassword, getAuth } from 'firebase/auth';
+import { supabase } from '@/lib/supabase';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -34,11 +34,12 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
     setSuccess(false);
 
     try {
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) throw new Error('Пользователь не авторизован');
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
-      await updatePassword(user, newPassword);
+      if (updateError) throw updateError;
+
       setSuccess(true);
       setTimeout(() => {
         onClose();
@@ -48,11 +49,7 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
       }, 2000);
     } catch (err: any) {
       console.error('Password change error:', err);
-      if (err.code === 'auth/requires-recent-login') {
-        setError('Необходимо перезайти в аккаунт для смены пароля');
-      } else {
-        setError('Произошла ошибка при смене пароля');
-      }
+      setError(err.message || 'Произошла ошибка при смене пароля');
     } finally {
       setLoading(false);
     }

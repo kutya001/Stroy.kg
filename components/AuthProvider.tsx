@@ -1,9 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import AuthModal from './AuthModal';
 import OnboardingModal from './OnboardingModal';
 
@@ -33,52 +32,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
+    const fetchUser = async (sessionUser: User | null) => {
+      setUser(sessionUser);
       
-      if (currentUser) {
+      if (sessionUser) {
         // Fetch or create user document
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
+        const { data: existingUser, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('uid', sessionUser.id)
+          .single();
         
-        if (userSnap.exists()) {
-          const data = userSnap.data();
-          setUserData(data);
-          if (!data.onboardingCompleted) {
+        if (existingUser) {
+          setUserData(existingUser);
+          if (!existingUser.onboardingCompleted) {
             setIsOnboardingModalOpen(true);
           }
         } else {
-          // Create new user profile with onboardingCompleted: false
-          // Use admin role for the specific email
-          const isAdmin = currentUser.email === 'kutmanomuraliev012@gmail.com';
+          // Create new user profile
+          const isAdmin = sessionUser.email === 'kutmanomuraliev012@gmail.com';
           const newUserData = {
-            uid: currentUser.uid,
-            name: currentUser.phoneNumber || currentUser.email?.split('@')[0] || 'Пользователь',
-            email: currentUser.email || '',
-            role: isAdmin ? 'admin' : 'consumer', // Default role, will be updated in onboarding
+            uid: sessionUser.id,
+            name: sessionUser.phone || sessionUser.email?.split('@')[0] || 'Пользователь',
+            email: sessionUser.email || '',
+            role: isAdmin ? 'admin' : 'consumer',
             onboardingCompleted: false,
-            createdAt: serverTimestamp(),
           };
-          await setDoc(userRef, newUserData);
-          setUserData(newUserData);
-          setIsOnboardingModalOpen(true);
+
+          const { data: insertedUser, error: insertError } = await supabase
+            .from('users')
+            .insert([newUserData])
+            .select()
+            .single();
+
+          if (insertedUser) {
+            setUserData(insertedUser);
+            setIsOnboardingModalOpen(true);
+          } else {
+            console.error("Error creating user profile", insertError);
+          }
         }
-        setIsAuthModalOpen(false); // Close modal on successful login
+        setIsAuthModalOpen(false);
       } else {
         setUserData(null);
       }
-      
       setLoading(false);
+    };
+
+    // Initial check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetchUser(session?.user || null);
     });
 
-    return () => unsubscribe();
+    // Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      fetchUser(session?.user || null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const openAuthModal = () => setIsAuthModalOpen(true);
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
     } catch (error) {
       console.error('Error signing out', error);
     }

@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { updateProfile } from 'firebase/auth';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { X, Loader2, Upload, File as FileIcon, Trash2, Camera } from 'lucide-react';
 import Image from 'next/image';
 
@@ -62,28 +59,29 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
     setUploadingPhoto(true);
     
     try {
-      const fileId = Math.random().toString(36).substring(7);
-      const storageRef = ref(storage, `users/${user.uid}/avatar_${fileId}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/avatar_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-      uploadTask.on(
-        'state_changed',
-        null,
-        (error) => {
-          console.error('Upload error:', error);
-          setError('Ошибка при загрузке фото.');
-          setUploadingPhoto(false);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          setPhotoURL(downloadURL);
-          await updateProfile(user, { photoURL: downloadURL });
-          setUploadingPhoto(false);
-        }
-      );
+      const { error: uploadError, data } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      setPhotoURL(publicUrl);
+
+      // Update users table and auth user metadata
+      await supabase.from('users').update({ photoURL: publicUrl }).eq('id', user.id);
+      await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
+
     } catch (err) {
-      console.error('Error initiating photo upload:', err);
+      console.error('Error uploading photo:', err);
       setError('Ошибка при загрузке фото.');
+    } finally {
       setUploadingPhoto(false);
     }
   };
@@ -108,40 +106,38 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
     }
 
     setError('');
-    const fileId = Math.random().toString(36).substring(7);
-    const storageRef = ref(storage, `users/${user.uid}/${type}/${fileId}_${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    // Mocking progress for simplicity with Supabase standard upload
+    setUploadProgress(prev => ({ ...prev, [file.name]: 50 }));
 
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
-      },
-      (error) => {
-        console.error('Upload error:', error);
-        setError('Ошибка при загрузке файла.');
-        setUploadProgress(prev => {
-          const newProg = { ...prev };
-          delete newProg[file.name];
-          return newProg;
-        });
-      },
-      async () => {
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        const newFile = { name: file.name, url: downloadURL };
-        
-        if (type === 'documents') setDocuments(prev => [...prev, newFile]);
-        if (type === 'projects') setProjects(prev => [...prev, newFile]);
-        if (type === 'certificates') setCertificates(prev => [...prev, newFile]);
-        
-        setUploadProgress(prev => {
-          const newProg = { ...prev };
-          delete newProg[file.name];
-          return newProg;
-        });
-      }
-    );
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${type}/${Math.random().toString(36).substring(7)}_${file.name}`;
+
+      const { error: uploadError, data } = await supabase.storage
+        .from('user_files')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('user_files')
+        .getPublicUrl(fileName);
+
+      const newFile = { name: file.name, url: publicUrl };
+
+      if (type === 'documents') setDocuments(prev => [...prev, newFile]);
+      if (type === 'projects') setProjects(prev => [...prev, newFile]);
+      if (type === 'certificates') setCertificates(prev => [...prev, newFile]);
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      setError('Ошибка при загрузке файла.');
+    } finally {
+      setUploadProgress(prev => {
+        const newProg = { ...prev };
+        delete newProg[file.name];
+        return newProg;
+      });
+    }
   };
 
   const removeFile = (type: 'documents' | 'projects' | 'certificates', index: number) => {
@@ -164,7 +160,6 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
     setError('');
 
     try {
-      const userRef = doc(db, 'users', user.uid);
       const updateData: any = { name, region };
 
       if (role === 'consumer') {
@@ -184,12 +179,18 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
         updateData.categories = categories;
       }
 
-      // Clean up undefined/empty values to avoid Firestore errors
+      // Clean up undefined/empty values to avoid issues
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === undefined) delete updateData[key];
       });
 
-      await updateDoc(userRef, updateData);
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
       onSave(updateData);
     } catch (err: any) {
       console.error('Error updating profile:', err);

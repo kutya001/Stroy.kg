@@ -1,10 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Phone, ShieldCheck, Loader2, ArrowRight } from 'lucide-react';
-import { auth, db } from '@/lib/firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
 interface ChangePhoneModalProps {
   isOpen: boolean;
@@ -19,18 +17,6 @@ export default function ChangePhoneModal({ isOpen, onClose }: ChangePhoneModalPr
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [timer, setTimer] = useState(300);
-  const [verificationId, setVerificationId] = useState<string | null>(null);
-  
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-
-  useEffect(() => {
-    if (isOpen && !recaptchaVerifierRef.current && recaptchaContainerRef.current) {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
-        size: 'invisible',
-      });
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -58,23 +44,18 @@ export default function ChangePhoneModal({ isOpen, onClose }: ChangePhoneModalPr
 
     try {
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-      if (!recaptchaVerifierRef.current) throw new Error('Recaptcha not initialized');
 
-      // Use signInWithPhoneNumber to get verificationId (it works for linking too)
-      const provider = new PhoneAuthProvider(auth);
-      const verId = await provider.verifyPhoneNumber(formattedPhone, recaptchaVerifierRef.current);
+      const { error: updateError } = await supabase.auth.updateUser({
+        phone: formattedPhone
+      });
+
+      if (updateError) throw updateError;
       
-      setVerificationId(verId);
       setStep('otp');
       setTimer(300);
     } catch (err: any) {
       console.error('SMS Error:', err);
       setError(err.message || 'Ошибка отправки SMS. Проверьте номер.');
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.render().then(widgetId => {
-          (window as any).grecaptcha.reset(widgetId);
-        });
-      }
     } finally {
       setLoading(false);
     }
@@ -91,19 +72,15 @@ export default function ChangePhoneModal({ isOpen, onClose }: ChangePhoneModalPr
     setError('');
 
     try {
-      if (!verificationId) throw new Error('Нет ID верификации');
-      if (!auth.currentUser) throw new Error('Пользователь не авторизован');
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
 
-      const credential = PhoneAuthProvider.credential(verificationId, otp);
-      
-      // Update phone number in Firebase Auth
-      await updatePhoneNumber(auth.currentUser, credential);
-      
-      // Update phone number in Firestore (if we store it there)
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userRef, {
-        phoneNumber: auth.currentUser.phoneNumber
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: otp,
+        type: 'phone_change',
       });
+
+      if (verifyError) throw verifyError;
 
       setSuccess('Номер телефона успешно изменен!');
       setTimeout(() => {
@@ -174,8 +151,6 @@ export default function ChangePhoneModal({ isOpen, onClose }: ChangePhoneModalPr
                   />
                 </div>
               </div>
-
-              <div id="recaptcha-container-change" ref={recaptchaContainerRef}></div>
 
               <button
                 type="submit"
