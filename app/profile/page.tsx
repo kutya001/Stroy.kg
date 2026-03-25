@@ -7,6 +7,7 @@ import ChangePhoneModal from '@/components/ChangePhoneModal';
 import ProfileEditor from '@/components/ProfileEditor';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import { Lock } from 'lucide-react';
+import Link from 'next/link';
 
 export default function ProfilePage() {
   const { user, userData, logout, openAuthModal } = useAuth();
@@ -230,6 +231,22 @@ export default function ProfilePage() {
           <ChevronRight className="w-5 h-5 text-slate-400" />
         </div>
         
+        {/* Supplier Products Page */}
+        {(userData?.role === 'developer' || userData?.role === 'supplier') && (
+          <Link href="/profile/products" className="p-4 border-b border-slate-100 hover:bg-slate-50 flex items-center justify-between transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Package className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-medium text-secondary block">Управление товарами</span>
+                {userData.verificationStatus === 'pending' && <span className="text-xs text-amber-600 font-bold">Ожидает подтверждения</span>}
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400" />
+          </Link>
+        )}
+
         {/* Phone Number Change */}
         <div 
           onClick={() => setIsChangingPhone(true)}
