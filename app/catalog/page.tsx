@@ -77,13 +77,14 @@ export default function CatalogPage() {
         // Extract unique supplier IDs
         const supplierIds = Array.from(new Set(rawProducts.map(p => p.supplierId)));
 
-        // Fetch suppliers matching the IDs
+        // Fetch suppliers matching the IDs, filtering to ONLY include verified ones
         let suppliersMap = new Map();
         if (supplierIds.length > 0) {
           const { data: suppliers, error: suppliersError } = await supabase
             .from('users')
             .select('id, name, companyName, verificationStatus, rating, region')
-            .in('id', supplierIds);
+            .in('id', supplierIds)
+            .eq('verificationStatus', 'verified');
 
           if (!suppliersError && suppliers) {
             suppliers.forEach(s => {
@@ -92,19 +93,23 @@ export default function CatalogPage() {
           }
         }
 
-        // Map products with their supplier data
-        const fetchedProducts = rawProducts.map(product => {
+        // Map products with their supplier data, and exclude those whose supplier isn't found (not verified)
+        const fetchedProducts = rawProducts.reduce((acc: any[], product) => {
           const sData = suppliersMap.get(product.supplierId);
 
-          return {
-            ...product,
-            supplierName: sData?.companyName || sData?.name || 'Неизвестный поставщик',
-            supplierVerified: sData?.verificationStatus === 'verified',
-            supplierRating: sData?.rating || 5.0,
-            supplierReviewCount: 0,
-            region: sData?.region || product.region || 'Кыргызстан'
-          };
-        });
+          // Only add the product if the supplier is in our map (which means they are verified)
+          if (sData) {
+            acc.push({
+              ...product,
+              supplierName: sData.companyName || sData.name || 'Неизвестный поставщик',
+              supplierVerified: true,
+              supplierRating: sData.rating || 5.0,
+              supplierReviewCount: 0,
+              region: sData.region || product.region || 'Кыргызстан'
+            });
+          }
+          return acc;
+        }, []);
 
         setProducts(fetchedProducts);
       } catch (error) {

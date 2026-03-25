@@ -22,21 +22,21 @@ CREATE TABLE public.users (
   email TEXT UNIQUE,
   phone TEXT UNIQUE,
   role user_role NOT NULL DEFAULT 'consumer',
-  photoURL TEXT,
+  "photoURL" TEXT,
   region TEXT,
 
   -- State flags
-  onboardingCompleted BOOLEAN DEFAULT FALSE,
-  verificationStatus verification_status DEFAULT 'pending',
+  "onboardingCompleted" BOOLEAN DEFAULT FALSE,
+  "verificationStatus" verification_status DEFAULT 'pending',
   rating NUMERIC(3, 2) DEFAULT 5.00,
 
   -- Consumer specific
-  dateOfBirth DATE,
+  "dateOfBirth" DATE,
   address TEXT,
-  housingType TEXT,
+  "housingType" TEXT,
 
   -- Developer & Supplier specific
-  companyName TEXT,
+  "companyName" TEXT,
   inn TEXT,
 
   -- JSON fields for arrays of files/strings (URLs and names)
@@ -77,8 +77,27 @@ CREATE POLICY "Users can insert their own profile" ON public.users
   FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- 3. Users can update their own profile
+-- 3. Users can update their own profile (Restricting sensitive columns via a trigger below)
 CREATE POLICY "Users can update own profile" ON public.users
   FOR UPDATE USING (auth.uid() = id);
+
+-- Trigger to prevent users from escalating privileges or auto-verifying themselves
+CREATE OR REPLACE FUNCTION protect_sensitive_user_fields()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- If the user performing the update is NOT an admin, prevent changes to role and verificationStatus
+    IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin') THEN
+        NEW.role = OLD.role;
+        NEW."verificationStatus" = OLD."verificationStatus";
+    END IF;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER prevent_user_privilege_escalation
+BEFORE UPDATE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION protect_sensitive_user_fields();
 
 -- 4. Admins can update any profile (e.g., changing verification status)
 CREATE POLICY "Admins can update all profiles" ON public.users
@@ -93,7 +112,7 @@ CREATE POLICY "Admins can update all profiles" ON public.users
 -- ==========================================
 CREATE TABLE public.products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  supplierId UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  "supplierId" UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
 
   name TEXT NOT NULL,
   description TEXT,
@@ -101,7 +120,7 @@ CREATE TABLE public.products (
   type product_type NOT NULL, -- 'material' or 'service'
   category TEXT NOT NULL,     -- Specific category name (e.g., 'Бетон и ЖБИ')
   region TEXT,
-  isActive BOOLEAN DEFAULT TRUE,
+  "isActive" BOOLEAN DEFAULT TRUE,
 
   -- Images (JSON array of URLs)
   images JSONB DEFAULT '[]'::jsonb,
@@ -122,21 +141,21 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for products
 -- 1. Anyone can view active products
 CREATE POLICY "Active products are viewable by everyone" ON public.products
-  FOR SELECT USING (isActive = TRUE);
+  FOR SELECT USING ("isActive" = TRUE);
 
 -- 2. Suppliers can view their own products (even if inactive)
 CREATE POLICY "Suppliers can view own products" ON public.products
-  FOR SELECT USING (auth.uid() = supplierId);
+  FOR SELECT USING (auth.uid() = "supplierId");
 
 -- 3. Suppliers can insert/update/delete their own products
 CREATE POLICY "Suppliers can insert own products" ON public.products
-  FOR INSERT WITH CHECK (auth.uid() = supplierId);
+  FOR INSERT WITH CHECK (auth.uid() = "supplierId");
 
 CREATE POLICY "Suppliers can update own products" ON public.products
-  FOR UPDATE USING (auth.uid() = supplierId);
+  FOR UPDATE USING (auth.uid() = "supplierId");
 
 CREATE POLICY "Suppliers can delete own products" ON public.products
-  FOR DELETE USING (auth.uid() = supplierId);
+  FOR DELETE USING (auth.uid() = "supplierId");
 
 -- ==========================================
 -- STORAGE BUCKETS
@@ -172,3 +191,131 @@ CREATE POLICY "Users can update their own files." ON storage.objects
 
 -- Note: The "auth.uid()::text = (storage.foldername(name))[1]" condition ensures
 -- that users can only upload files into a folder named after their UUID.
+
+-- ==========================================
+-- TABLE: requests (заявки)
+-- ==========================================
+CREATE TABLE public.requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "authorId" UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  category TEXT NOT NULL,
+  region TEXT NOT NULL,
+  budget NUMERIC,
+  "isActive" BOOLEAN DEFAULT TRUE,
+
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TRIGGER update_requests_modtime
+BEFORE UPDATE ON public.requests
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.requests ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for requests
+-- 1. Anyone can view active requests
+CREATE POLICY "Active requests are viewable by everyone" ON public.requests
+  FOR SELECT USING ("isActive" = TRUE);
+
+-- 2. Authors can view their own requests (even if inactive)
+CREATE POLICY "Authors can view own requests" ON public.requests
+  FOR SELECT USING (auth.uid() = "authorId");
+
+-- 3. Authors can insert/update/delete their own requests
+CREATE POLICY "Authors can insert own requests" ON public.requests
+  FOR INSERT WITH CHECK (auth.uid() = "authorId");
+
+CREATE POLICY "Authors can update own requests" ON public.requests
+  FOR UPDATE USING (auth.uid() = "authorId");
+
+CREATE POLICY "Authors can delete own requests" ON public.requests
+  FOR DELETE USING (auth.uid() = "authorId");
+
+
+-- ==========================================
+-- TABLE: chats
+-- ==========================================
+CREATE TABLE public.chats (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "requestId" UUID REFERENCES public.requests(id) ON DELETE SET NULL,
+  "consumerId" UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  "supplierId" UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE("requestId", "consumerId", "supplierId") -- Prevent duplicate chats for the same request between same users
+);
+
+CREATE TRIGGER update_chats_modtime
+BEFORE UPDATE ON public.chats
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+-- Enable RLS
+ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
+
+-- 1. Users can view chats they are part of
+CREATE POLICY "Users can view their chats" ON public.chats
+  FOR SELECT USING (auth.uid() = "consumerId" OR auth.uid() = "supplierId");
+
+-- 2. Users can create chats (typically a supplier initiating contact)
+CREATE POLICY "Users can create chats" ON public.chats
+  FOR INSERT WITH CHECK (auth.uid() = "consumerId" OR auth.uid() = "supplierId");
+
+
+-- ==========================================
+-- TABLE: messages
+-- ==========================================
+CREATE TABLE public.messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "chatId" UUID NOT NULL REFERENCES public.chats(id) ON DELETE CASCADE,
+  "senderId" UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+
+  content TEXT NOT NULL,
+  read BOOLEAN DEFAULT FALSE,
+
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+-- 1. Users can view messages in their chats
+CREATE POLICY "Users can view messages in their chats" ON public.messages
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.chats
+      WHERE chats.id = messages."chatId"
+      AND (chats."consumerId" = auth.uid() OR chats."supplierId" = auth.uid())
+    )
+  );
+
+-- 2. Users can send messages to their chats
+CREATE POLICY "Users can send messages to their chats" ON public.messages
+  FOR INSERT WITH CHECK (
+    auth.uid() = "senderId" AND
+    EXISTS (
+      SELECT 1 FROM public.chats
+      WHERE chats.id = "chatId"
+      AND (chats."consumerId" = auth.uid() OR chats."supplierId" = auth.uid())
+    )
+  );
+
+-- 3. Recipients can update message read status
+CREATE POLICY "Recipients can update message status" ON public.messages
+  FOR UPDATE USING (
+    auth.uid() != "senderId" AND
+    EXISTS (
+      SELECT 1 FROM public.chats
+      WHERE chats.id = messages."chatId"
+      AND (chats."consumerId" = auth.uid() OR chats."supplierId" = auth.uid())
+    )
+  );
