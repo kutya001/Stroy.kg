@@ -1,11 +1,165 @@
-import { Search, MapPin, Grid, SlidersHorizontal, Star, BadgeCheck, MessageSquare } from 'lucide-react';
+'use client';
+import { Search, MapPin, Grid, SlidersHorizontal, Star, BadgeCheck, MessageSquare, ChevronDown, Package, Briefcase, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
+import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { ProductCard } from '@/components/catalog/ProductCard';
+
+const CATEGORIES = {
+  material: [
+    'Бетон и ЖБИ',
+    'Арматура и металл',
+    'Кирпич и блоки',
+    'Лес и пиломатериалы',
+    'Кровля и фасад',
+    'Отделочные материалы',
+    'Инженерные системы',
+    'Окна и двери',
+    'Гидро- и теплоизоляция',
+    'Спецтехника и инструменты'
+  ],
+  service: [
+    'Проектирование',
+    'Земляные работы',
+    'Фундаментные работы',
+    'Монолитные работы',
+    'Кладочные работы',
+    'Кровельные работы',
+    'Фасадные работы',
+    'Отделка',
+    'Полы',
+    'Электромонтаж',
+    'Сантехника',
+    'Вентиляция и кондиционирование',
+    'Остекление',
+    'Ландшафт и благоустройство'
+  ]
+};
+
+const REGIONS = ['Весь Кыргызстан', 'Бишкек', 'Ош', 'Чуйская область', 'Иссык-Кульская область', 'Джалал-Абадская область', 'Нарынская область', 'Таласская область', 'Баткенская область'];
 
 export default function CatalogPage() {
+  const [activeTab, setActiveTab] = useState<'material' | 'service'>('material');
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('Весь Кыргызстан');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showRegionDropdown, setShowRegionDropdown] = useState(false);
+  const [sortBy, setSortBy] = useState<'rating' | 'price_asc' | 'price_desc' | 'newest'>('rating');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+
+  // Reset category when tab changes
+  useEffect(() => {
+    setSelectedCategory('');
+  }, [activeTab]);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const q = query(
+          collection(db, 'products'),
+          where('type', '==', activeTab),
+          where('isActive', '==', true)
+        );
+        const querySnapshot = await getDocs(q);
+
+        // Optimization: Resolve N+1 problem by using Promise.all and caching supplier data
+        const supplierCache = new Map();
+
+        const fetchedProducts = await Promise.all(
+          querySnapshot.docs.map(async (document) => {
+            const productData = document.data();
+            const supplierId = productData.supplierId;
+
+            let supplierName = 'Неизвестный поставщик';
+            let supplierVerified = false;
+            let supplierRating = 5.0;
+            let supplierReviewCount = 0;
+            let region = productData.region || 'Кыргызстан';
+
+            try {
+              if (supplierCache.has(supplierId)) {
+                const cachedData = supplierCache.get(supplierId);
+                supplierName = cachedData.supplierName;
+                supplierVerified = cachedData.supplierVerified;
+                supplierRating = cachedData.supplierRating;
+                region = cachedData.region;
+              } else {
+                const supplierRef = doc(db, 'users', supplierId);
+                const supplierSnap = await getDoc(supplierRef);
+                if (supplierSnap.exists()) {
+                  const sData = supplierSnap.data();
+                  supplierName = sData.companyName || sData.name || supplierName;
+                  supplierVerified = sData.verificationStatus === 'verified';
+                  supplierRating = sData.rating || 5.0;
+                  region = sData.region || region;
+
+                  supplierCache.set(supplierId, {
+                    supplierName,
+                    supplierVerified,
+                    supplierRating,
+                    region
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Error fetching supplier data:", e);
+            }
+
+            return {
+              id: document.id,
+              ...productData,
+              supplierName,
+              supplierVerified,
+              supplierRating,
+              supplierReviewCount,
+              region
+            };
+          })
+        );
+
+        setProducts(fetchedProducts);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [activeTab]);
+
+  let filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory ? p.category === selectedCategory : true;
+    const matchesRegion = selectedRegion !== 'Весь Кыргызстан' ? p.region.includes(selectedRegion) : true;
+
+    return matchesSearch && matchesCategory && matchesRegion;
+  });
+
+  // Apply sorting
+  filteredProducts = filteredProducts.sort((a, b) => {
+    switch (sortBy) {
+      case 'price_asc': return a.price - b.price;
+      case 'price_desc': return b.price - a.price;
+      case 'newest': return b.createdAt?.toMillis() - a.createdAt?.toMillis();
+      case 'rating':
+      default:
+        return b.supplierRating - a.supplierRating;
+    }
+  });
+
   return (
     <main className="max-w-7xl mx-auto px-4 md:px-6 pt-6 pb-24">
       {/* Hero */}
-      <section className="mb-12 relative overflow-hidden rounded-3xl bg-secondary p-8 md:p-12">
+      <section className="mb-8 relative overflow-hidden rounded-3xl bg-secondary p-8 md:p-12">
         <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
           <div className="w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/50 via-transparent to-transparent"></div>
         </div>
@@ -20,117 +174,136 @@ export default function CatalogPage() {
       <div className="flex flex-col md:flex-row gap-4 mb-8 sticky top-20 z-40">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-          <input type="text" placeholder="Поиск по названию компании или продукции..." className="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 shadow-sm outline-none" />
+          <input
+            type="text"
+            placeholder="Поиск по названию или категории..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 shadow-sm outline-none"
+          />
         </div>
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
-          <button className="flex items-center gap-2 h-14 px-6 bg-white border border-slate-200 text-slate-700 font-medium rounded-2xl hover:bg-slate-50 transition-colors whitespace-nowrap shadow-sm">
-            <MapPin className="w-5 h-5" /> Регион
-          </button>
-          <button className="flex items-center gap-2 h-14 px-6 bg-white border border-slate-200 text-slate-700 font-medium rounded-2xl hover:bg-slate-50 transition-colors whitespace-nowrap shadow-sm">
-            <Grid className="w-5 h-5" /> Тип продукции
-          </button>
-          <button className="flex items-center gap-2 h-14 px-6 bg-primary/10 text-primary font-medium rounded-2xl hover:bg-primary/20 transition-colors whitespace-nowrap border border-primary/20">
-            <SlidersHorizontal className="w-5 h-5" /> Фильтры
-          </button>
+        <div className="flex gap-2 overflow-visible pb-2 md:pb-0 relative z-50">
+          {/* Region Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowRegionDropdown(!showRegionDropdown); setShowCategoryDropdown(false); setShowSortDropdown(false); }}
+              className="flex items-center gap-2 h-14 px-4 bg-white border border-slate-200 text-slate-700 font-medium rounded-2xl hover:bg-slate-50 transition-colors whitespace-nowrap shadow-sm"
+            >
+              <MapPin className="w-5 h-5 text-slate-400" /> {selectedRegion} <ChevronDown className="w-4 h-4 text-slate-400" />
+            </button>
+            {showRegionDropdown && (
+              <div className="absolute top-full mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50">
+                {REGIONS.map(region => (
+                  <button
+                    key={region}
+                    onClick={() => { setSelectedRegion(region); setShowRegionDropdown(false); }}
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${selectedRegion === region ? 'font-bold text-primary bg-primary/5' : 'text-slate-700'}`}
+                  >
+                    {region}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Category Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowCategoryDropdown(!showCategoryDropdown); setShowRegionDropdown(false); setShowSortDropdown(false); }}
+              className="flex items-center gap-2 h-14 px-4 bg-white border border-slate-200 text-slate-700 font-medium rounded-2xl hover:bg-slate-50 transition-colors whitespace-nowrap shadow-sm"
+            >
+              <Grid className="w-5 h-5 text-slate-400" /> {selectedCategory || 'Все категории'} <ChevronDown className="w-4 h-4 text-slate-400" />
+            </button>
+            {showCategoryDropdown && (
+              <div className="absolute top-full mt-2 w-64 max-h-96 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl z-50">
+                <button
+                  onClick={() => { setSelectedCategory(''); setShowCategoryDropdown(false); }}
+                  className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${!selectedCategory ? 'font-bold text-primary bg-primary/5' : 'text-slate-700'}`}
+                >
+                  Все категории
+                </button>
+                {CATEGORIES[activeTab].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => { setSelectedCategory(cat); setShowCategoryDropdown(false); }}
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${selectedCategory === cat ? 'font-bold text-primary bg-primary/5' : 'text-slate-700'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowSortDropdown(!showSortDropdown); setShowRegionDropdown(false); setShowCategoryDropdown(false); }}
+              className="flex items-center gap-2 h-14 px-6 bg-primary/10 text-primary font-bold rounded-2xl hover:bg-primary/20 transition-colors whitespace-nowrap border border-primary/20"
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+              {sortBy === 'rating' && 'Сначала лучшие'}
+              {sortBy === 'price_asc' && 'Сначала дешевые'}
+              {sortBy === 'price_desc' && 'Сначала дорогие'}
+              {sortBy === 'newest' && 'Сначала новые'}
+            </button>
+            {showSortDropdown && (
+              <div className="absolute top-full mt-2 right-0 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50">
+                <button onClick={() => { setSortBy('rating'); setShowSortDropdown(false); }} className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${sortBy === 'rating' ? 'font-bold text-primary bg-primary/5' : 'text-slate-700'}`}>Сначала лучшие</button>
+                <button onClick={() => { setSortBy('price_asc'); setShowSortDropdown(false); }} className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${sortBy === 'price_asc' ? 'font-bold text-primary bg-primary/5' : 'text-slate-700'}`}>Сначала дешевые</button>
+                <button onClick={() => { setSortBy('price_desc'); setShowSortDropdown(false); }} className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${sortBy === 'price_desc' ? 'font-bold text-primary bg-primary/5' : 'text-slate-700'}`}>Сначала дорогие</button>
+                <button onClick={() => { setSortBy('newest'); setShowSortDropdown(false); }} className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${sortBy === 'newest' ? 'font-bold text-primary bg-primary/5' : 'text-slate-700'}`}>Сначала новые</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Card 1 */}
-        <div className="group bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col border border-slate-100">
-          <div className="relative h-48 overflow-hidden">
-            <Image src="https://picsum.photos/seed/factory/600/400" alt="Factory" fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
-            <div className="absolute top-4 left-4">
-              <span className="px-2 py-1 bg-success text-white text-[10px] font-bold rounded">TOP ПОСТАВЩИК</span>
-            </div>
-            <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1">
-              <Star className="w-3 h-3 text-accent fill-accent" />
-              <span className="text-xs font-bold">4.9</span>
-            </div>
+      {/* Tabs */}
+      <div className="flex gap-4 mb-8 border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('material')}
+          className={`pb-4 px-2 font-bold text-lg transition-colors relative ${activeTab === 'material' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5" /> Материалы
           </div>
-          <div className="p-6 flex-1 flex flex-col">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-heading text-xl font-bold text-secondary leading-tight">БетонПромСтрой</h3>
-              <BadgeCheck className="w-6 h-6 text-success" />
-            </div>
-            <p className="text-xs text-slate-500 mb-4">Бишкек и Чуйская обл. • 15 лет на рынке</p>
-            <div className="flex flex-wrap gap-2 mb-6">
-              <span className="bg-slate-100 px-2 py-1 rounded-md text-[10px] text-slate-600 font-medium">Бетон М100-М500</span>
-              <span className="bg-slate-100 px-2 py-1 rounded-md text-[10px] text-slate-600 font-medium">ЖБИ изделия</span>
-              <span className="bg-slate-100 px-2 py-1 rounded-md text-[10px] text-slate-600 font-medium">Арматура</span>
-            </div>
-            <div className="mt-auto flex items-center gap-2">
-              <button className="flex-1 bg-primary text-white h-10 rounded-xl text-sm font-bold hover:bg-primary-dark active:scale-95 transition-all">Отправить запрос</button>
-              <button className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors">
-                <MessageSquare className="w-5 h-5 text-primary" />
-              </button>
-            </div>
+          {activeTab === 'material' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full"></div>}
+        </button>
+        <button
+          onClick={() => setActiveTab('service')}
+          className={`pb-4 px-2 font-bold text-lg transition-colors relative ${activeTab === 'service' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <div className="flex items-center gap-2">
+            <Briefcase className="w-5 h-5" /> Услуги
           </div>
-        </div>
+          {activeTab === 'service' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full"></div>}
+        </button>
+      </div>
 
-        {/* Card 2 */}
-        <div className="group bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col border border-slate-100">
-          <div className="relative h-48 overflow-hidden">
-            <Image src="https://picsum.photos/seed/wood/600/400" alt="Wood" fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
-            <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1">
-              <Star className="w-3 h-3 text-accent fill-accent" />
-              <span className="text-xs font-bold">4.7</span>
-            </div>
-          </div>
-          <div className="p-6 flex-1 flex flex-col">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-heading text-xl font-bold text-secondary leading-tight">СеверЛес Экспорт</h3>
-              <BadgeCheck className="w-6 h-6 text-success" />
-            </div>
-            <p className="text-xs text-slate-500 mb-4">Ош • Доставка по КР</p>
-            <div className="flex flex-wrap gap-2 mb-6">
-              <span className="bg-slate-100 px-2 py-1 rounded-md text-[10px] text-slate-600 font-medium">Пиломатериалы</span>
-              <span className="bg-slate-100 px-2 py-1 rounded-md text-[10px] text-slate-600 font-medium">Брус</span>
-              <span className="bg-slate-100 px-2 py-1 rounded-md text-[10px] text-slate-600 font-medium">Доска</span>
-            </div>
-            <div className="mt-auto flex items-center gap-2">
-              <button className="flex-1 bg-primary text-white h-10 rounded-xl text-sm font-bold hover:bg-primary-dark active:scale-95 transition-all">Отправить запрос</button>
-              <button className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors">
-                <MessageSquare className="w-5 h-5 text-primary" />
-              </button>
-            </div>
-          </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-
-        {/* Card 3 */}
-        <div className="group bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col border border-slate-100">
-          <div className="relative h-48 overflow-hidden">
-            <Image src="https://picsum.photos/seed/bricks/600/400" alt="Bricks" fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
-            <div className="absolute top-4 left-4">
-              <span className="px-2 py-1 bg-accent text-secondary text-[10px] font-bold rounded">НОВИНКА</span>
-            </div>
-            <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1">
-              <Star className="w-3 h-3 text-accent fill-accent" />
-              <span className="text-xs font-bold">5.0</span>
-            </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="bg-slate-50 rounded-3xl p-12 text-center flex flex-col items-center justify-center border border-slate-200">
+          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+            <Search className="w-10 h-10 text-slate-300" />
           </div>
-          <div className="p-6 flex-1 flex flex-col">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-heading text-xl font-bold text-secondary leading-tight">КерамоБлок Центр</h3>
-              <BadgeCheck className="w-6 h-6 text-success" />
-            </div>
-            <p className="text-xs text-slate-500 mb-4">Джалал-Абад • Прямой производитель</p>
-            <div className="flex flex-wrap gap-2 mb-6">
-              <span className="bg-slate-100 px-2 py-1 rounded-md text-[10px] text-slate-600 font-medium">Кирпич</span>
-              <span className="bg-slate-100 px-2 py-1 rounded-md text-[10px] text-slate-600 font-medium">Керамоблоки</span>
-            </div>
-            <div className="mt-auto flex items-center gap-2">
-              <button className="flex-1 bg-primary text-white h-10 rounded-xl text-sm font-bold hover:bg-primary-dark active:scale-95 transition-all">Отправить запрос</button>
-              <button className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors">
-                <MessageSquare className="w-5 h-5 text-primary" />
-              </button>
-            </div>
-          </div>
+          <h3 className="text-xl font-bold text-secondary mb-2">Ничего не найдено</h3>
+          <p className="text-slate-500 max-w-md">По вашему запросу нет активных предложений. Попробуйте изменить параметры поиска или фильтры.</p>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredProducts.map(product => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
 
-        {/* Horizontal Highlight Card */}
-        <div className="md:col-span-2 lg:col-span-3 bg-white rounded-2xl p-6 flex flex-col md:flex-row gap-8 items-center border-l-4 border-primary shadow-sm">
+      {/* Featured Supplier (Static highlight for now) */}
+      {!loading && filteredProducts.length > 0 && (
+        <div className="mt-12 bg-white rounded-2xl p-6 flex flex-col md:flex-row gap-8 items-center border-l-4 border-primary shadow-sm">
           <div className="w-full md:w-1/3 aspect-video rounded-xl overflow-hidden shrink-0 relative">
             <Image src="https://picsum.photos/seed/metal/800/450" alt="Metal" fill className="object-cover" />
           </div>
@@ -167,7 +340,7 @@ export default function CatalogPage() {
             </div>
           </div>
         </div>
-      </div>
+      )}
     </main>
   );
 }
