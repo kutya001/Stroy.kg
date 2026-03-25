@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: existingUser, error: fetchError } = await supabase
           .from('users')
           .select('*')
-          .eq('uid', sessionUser.id)
+          .eq('id', sessionUser.id)
           .single();
         
         if (existingUser) {
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Create new user profile
           const isAdmin = sessionUser.email === 'kutmanomuraliev012@gmail.com';
           const newUserData = {
-            uid: sessionUser.id,
+            id: sessionUser.id,
             name: sessionUser.phone || sessionUser.email?.split('@')[0] || 'Пользователь',
             email: sessionUser.email || '',
             role: isAdmin ? 'admin' : 'consumer',

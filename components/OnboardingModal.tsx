@@ -56,7 +56,7 @@ export default function OnboardingModal({ isOpen, user, onComplete }: Onboarding
       const { error: updateError } = await supabase
         .from('users')
         .update(updateData)
-        .eq('uid', user.id || user.uid);
+        .eq('id', user.id);
 
       if (updateError) throw updateError;
 
