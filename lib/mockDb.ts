@@ -1,4 +1,15 @@
-export const mockUsers = [
+export interface MockUser {
+  uid: string;
+  name: string;
+  phone: string;
+  password?: string;
+  role: string;
+  onboardingCompleted: boolean;
+  createdAt: string;
+  verificationStatus?: string;
+}
+
+export const mockUsers: MockUser[] = [
   {
     uid: 'admin-123',
     name: 'Администратор',
