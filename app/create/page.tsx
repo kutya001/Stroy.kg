@@ -17,8 +17,10 @@ export default function CreatePage() {
   const [budget, setBudget] = useState('');
   const [description, setDescription] = useState('');
   const [myRequests, setMyRequests] = useState<any[]>([]);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (user) {
       setMyRequests(getMockRequestsByAuthor(user.uid));
     }
@@ -205,7 +207,7 @@ export default function CreatePage() {
                 <div className="flex justify-between items-start mb-3">
                   <span className="text-xs font-bold text-primary uppercase tracking-tighter">{req.category}</span>
                   <span className="text-xs text-slate-400">
-                    {new Date(req.createdAt).toLocaleDateString('ru-RU')}
+                    {mounted ? new Date(req.createdAt).toLocaleDateString('ru-RU') : ''}
                   </span>
                 </div>
                 <h3 className="text-base font-bold text-secondary mb-2">{req.title}</h3>

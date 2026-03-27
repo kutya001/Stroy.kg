@@ -5,11 +5,17 @@ import { MapPin, ArrowRight, CheckCircle2, Plus, Search, PackagePlus, Store } fr
 import Link from 'next/link';
 import { getAllMockRequests } from '@/lib/mockDb';
 import { useAuth } from '@/components/AuthProvider';
+import { useEffect, useState } from 'react';
 
 export default function FeedPage() {
   const requests = getAllMockRequests();
   const { userData } = useAuth();
   const isSupplier = userData?.role === 'supplier';
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <main className="max-w-5xl mx-auto px-4 pb-24 pt-6">
@@ -89,7 +95,7 @@ export default function FeedPage() {
                     {req.category}
                   </span>
                   <span className="text-xs text-slate-500 font-medium">
-                    {new Date(req.createdAt).toLocaleDateString('ru-RU', { hour: '2-digit', minute: '2-digit' })} • {req.authorName}
+                    {mounted ? new Date(req.createdAt).toLocaleDateString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''} • {req.authorName}
                   </span>
                 </div>
                 <h3 className="text-xl font-heading font-semibold leading-tight mb-2 text-secondary">{req.title}</h3>

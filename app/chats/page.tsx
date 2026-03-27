@@ -9,8 +9,10 @@ import { getMockChats } from '@/lib/mockDb';
 export default function ChatsPage() {
   const { user } = useAuth();
   const [chats, setChats] = useState<any[]>([]);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (user) {
       setChats(getMockChats(user.uid));
     }
@@ -71,7 +73,7 @@ export default function ChatsPage() {
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-heading font-bold text-secondary truncate pr-4">{chat.otherUser.name}</h3>
                   <span className="text-xs text-slate-400 whitespace-nowrap">
-                    {new Date(chat.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    {mounted ? new Date(chat.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
