@@ -1,5 +1,5 @@
 'use client';
-import { Bell, User, LogIn, CheckCircle2 } from 'lucide-react';
+import { Bell, User, LogIn, CheckCircle2, Eye, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
@@ -9,7 +9,7 @@ import { getMockNotifications, markNotificationAsRead } from '@/lib/mockDb';
 
 export default function Header() {
   const pathname = usePathname();
-  const { user, userData, openAuthModal } = useAuth();
+  const { user, userData, openAuthModal, isAdminMode, adminViewAs, setAdminViewAs } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -40,6 +40,14 @@ export default function Header() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
+    <>
+    {isAdminMode && adminViewAs && (
+      <div className="sticky top-0 z-[60] bg-amber-500 text-white text-center py-1 px-4 text-xs font-bold flex items-center justify-center gap-2">
+        <Eye className="w-3 h-3" />
+        Просмотр как: {adminViewAs === 'consumer' ? 'Покупатель' : adminViewAs === 'supplier' ? 'Поставщик' : 'Застройщик'}
+        <button onClick={() => setAdminViewAs(null)} className="ml-2 bg-white/20 hover:bg-white/30 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+      </div>
+    )}
     <header className="flex justify-between items-center px-4 h-16 w-full sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-slate-200">
       <div className="flex items-center gap-3">
         {user ? (
@@ -130,5 +138,6 @@ export default function Header() {
         )}
       </div>
     </header>
+    </>
   );
 }

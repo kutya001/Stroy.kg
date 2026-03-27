@@ -1,4 +1,15 @@
 // ==========================================
+// VERIFICATION CONFIG
+// ==========================================
+// Set to `true` to enable real verification (SMS/email APIs, etc.)
+// When `false`, all verification steps are instantly approved (mock mode)
+export const VERIFICATION_CONFIG = {
+  useMock: true, // false = real verification (connect real APIs)
+  mockOtpCode: '1234', // OTP code accepted in mock mode
+  mockDelay: 800, // simulated network delay (ms)
+};
+
+// ==========================================
 // NOMENCLATURE STRUCTURE
 // ==========================================
 
@@ -670,6 +681,10 @@ export const getAllMockProducts = (onlyPublished = false) => {
   return [...products];
 };
 
+export const getProductById = (id: string): MockProduct | null => {
+  return products.find(p => p.id === id) || null;
+};
+
 export const getProductsBySupplierId = (supplierId: string) => {
   return products.filter(p => p.supplierId === supplierId);
 };
@@ -916,3 +931,68 @@ export const getVerificationColor = (level: VerificationLevel): string => {
   };
   return colors[level];
 };
+
+// ==========================================
+// MOCK VERIFICATION FUNCTIONS
+// ==========================================
+// These simulate verification steps. When VERIFICATION_CONFIG.useMock is false,
+// replace the implementations with real API calls.
+
+export async function sendPhoneOtp(phone: string): Promise<boolean> {
+  if (VERIFICATION_CONFIG.useMock) {
+    await new Promise(r => setTimeout(r, VERIFICATION_CONFIG.mockDelay));
+    return true; // always succeeds in mock mode
+  }
+  // TODO: Replace with real SMS API (e.g., Nikita SMS, Twilio)
+  throw new Error('Real phone verification not configured');
+}
+
+export async function verifyPhoneOtp(phone: string, code: string): Promise<boolean> {
+  if (VERIFICATION_CONFIG.useMock) {
+    await new Promise(r => setTimeout(r, VERIFICATION_CONFIG.mockDelay));
+    return code === VERIFICATION_CONFIG.mockOtpCode;
+  }
+  // TODO: Replace with real OTP verification API
+  throw new Error('Real phone verification not configured');
+}
+
+export async function sendEmailVerification(email: string): Promise<boolean> {
+  if (VERIFICATION_CONFIG.useMock) {
+    await new Promise(r => setTimeout(r, VERIFICATION_CONFIG.mockDelay));
+    return true;
+  }
+  // TODO: Replace with real email verification (e.g., SendGrid, Mailgun)
+  throw new Error('Real email verification not configured');
+}
+
+export async function verifyEmail(email: string, code: string): Promise<boolean> {
+  if (VERIFICATION_CONFIG.useMock) {
+    await new Promise(r => setTimeout(r, VERIFICATION_CONFIG.mockDelay));
+    return code === VERIFICATION_CONFIG.mockOtpCode;
+  }
+  // TODO: Replace with real email verification API
+  throw new Error('Real email verification not configured');
+}
+
+export async function submitInnVerification(uid: string, inn: string): Promise<boolean> {
+  if (VERIFICATION_CONFIG.useMock) {
+    await new Promise(r => setTimeout(r, VERIFICATION_CONFIG.mockDelay));
+    // In mock mode: auto-approve INN
+    updateMockUser(uid, { inn, passportScan: 'mock-scan.pdf' });
+    return true;
+  }
+  // TODO: Replace with real INN/passport verification service
+  throw new Error('Real INN verification not configured');
+}
+
+export async function submitLicenseVerification(uid: string, license: string): Promise<boolean> {
+  if (VERIFICATION_CONFIG.useMock) {
+    await new Promise(r => setTimeout(r, VERIFICATION_CONFIG.mockDelay));
+    const user = users.find(u => u.uid === uid);
+    const currentLicenses = user?.licenses || [];
+    updateMockUser(uid, { licenses: [...currentLicenses, license] });
+    return true;
+  }
+  // TODO: Replace with real license verification
+  throw new Error('Real license verification not configured');
+}

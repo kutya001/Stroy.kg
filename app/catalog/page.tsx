@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, MapPin, Star, BadgeCheck, MessageSquare, Plus, Filter, ChevronDown, Package, Wrench, ShoppingCart, Megaphone, Eye, Tag } from 'lucide-react';
+import { Search, MapPin, Star, BadgeCheck, MessageSquare, Plus, Filter, ChevronDown, Package, Wrench, ShoppingCart, Megaphone, Tag } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
@@ -189,7 +189,8 @@ export default function CatalogPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sortedProducts.map((product) => (
           <div key={product.id} className="group bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col border border-slate-100">
-            <div className="relative h-48 overflow-hidden">
+            <Link href={`/product/${product.id}`} className="block flex-1">
+              <div className="relative h-48 overflow-hidden">
               <Image src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
               <div className="absolute top-3 left-3 flex flex-col gap-1.5">
                 {product.isPromoted && (
@@ -212,7 +213,7 @@ export default function CatalogPage() {
                 <span className="text-xs font-bold">{product.rating}</span>
               </div>
             </div>
-            <div className="p-5 flex-1 flex flex-col">
+            <div className="p-5 flex flex-col">
               <div className="flex justify-between items-start mb-1">
                 <h3 className="font-heading text-base font-bold text-secondary leading-tight">{product.supplierName}</h3>
                 <BadgeCheck className="w-5 h-5 text-success shrink-0" />
@@ -237,13 +238,15 @@ export default function CatalogPage() {
 
               <p className="text-lg font-bold text-primary mb-3">{product.price.toLocaleString()} KGS / {product.unit}</p>
               
-              <div className="flex flex-wrap gap-1.5 mb-4">
+              <div className="flex flex-wrap gap-1.5">
                 {product.tags.map(tag => (
                   <span key={tag} className="bg-slate-100 px-2 py-0.5 rounded-md text-[10px] text-slate-600 font-medium">{tag}</span>
                 ))}
               </div>
+            </div>
+            </Link>
               
-              <div className="mt-auto flex items-center gap-2">
+            <div className="flex items-center gap-2 px-5 pb-5">
                 <Link href="/create" className="flex-1 bg-primary text-white h-10 rounded-xl text-sm font-bold hover:bg-primary-dark active:scale-95 transition-all flex items-center justify-center gap-1">
                   <ShoppingCart className="w-4 h-4" /> Запрос
                 </Link>
@@ -253,7 +256,6 @@ export default function CatalogPage() {
                 >
                   <MessageSquare className="w-5 h-5 text-primary" />
                 </button>
-              </div>
             </div>
           </div>
         ))}

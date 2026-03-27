@@ -1,21 +1,41 @@
 'use client';
 
 import Image from 'next/image';
-import { MapPin, ArrowRight, CheckCircle2, Plus, Search, PackagePlus, Store, Package, Wrench, BarChart3, Shield } from 'lucide-react';
+import { MapPin, ArrowRight, CheckCircle2, Plus, Search, PackagePlus, Store, Package, Wrench, BarChart3, Shield, Star, BadgeCheck, Megaphone, ShoppingCart, Tag } from 'lucide-react';
 import Link from 'next/link';
-import { getAllMockRequests, getVerificationLabel, getVerificationColor } from '@/lib/mockDb';
+import { getAllMockRequests, getAllMockProducts, getVerificationLabel, getVerificationColor, type NomenclatureCategory } from '@/lib/mockDb';
 import { useAuth } from '@/components/AuthProvider';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 export default function FeedPage() {
   const requests = getAllMockRequests();
+  const allProducts = getAllMockProducts(true);
   const { userData, canAccessRequests } = useAuth();
-  const isSupplier = userData?.role === 'supplier';
+  const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
   const [mounted, setMounted] = useState(false);
+  const [feedFilter, setFeedFilter] = useState<'all' | 'Товар' | 'Услуга'>('all');
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Buyer feed: products sorted by promoted first
+  const filteredProducts = useMemo(() => {
+    let list = allProducts;
+    if (feedFilter !== 'all') list = list.filter(p => p.nomenclatureCategory === feedFilter);
+    return [...list].sort((a, b) => {
+      if (a.isPromoted && !b.isPromoted) return -1;
+      if (!a.isPromoted && b.isPromoted) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [allProducts, feedFilter]);
+
+  // Supplier feed: requests filtered
+  const filteredRequests = useMemo(() => {
+    let list = requests;
+    if (feedFilter !== 'all') list = list.filter(r => r.category === feedFilter);
+    return list;
+  }, [requests, feedFilter]);
 
   return (
     <main className="max-w-5xl mx-auto px-4 pb-24 pt-6">
@@ -87,89 +107,170 @@ export default function FeedPage() {
         )}
       </section>
 
-      {/* Filters */}
+      {/* Feed Filters */}
       <section className="mb-6">
-        <h2 className="font-heading font-bold text-lg text-secondary mb-3">Лента заявок</h2>
+        <h2 className="font-heading font-bold text-lg text-secondary mb-3">
+          {isSupplier ? 'Лента заявок' : 'Лента товаров и услуг'}
+        </h2>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          <button className="px-5 py-2.5 rounded-full bg-secondary text-white font-medium text-sm shadow-sm whitespace-nowrap">Все</button>
-          <button className="px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-700 font-medium text-sm hover:bg-slate-50 transition-colors whitespace-nowrap">Товары</button>
-          <button className="px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-700 font-medium text-sm hover:bg-slate-50 transition-colors whitespace-nowrap">Услуги</button>
+          <button onClick={() => setFeedFilter('all')} className={`px-5 py-2.5 rounded-full font-medium text-sm shadow-sm whitespace-nowrap transition-colors ${feedFilter === 'all' ? 'bg-secondary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Все</button>
+          <button onClick={() => setFeedFilter('Товар')} className={`px-5 py-2.5 rounded-full font-medium text-sm shadow-sm whitespace-nowrap transition-colors ${feedFilter === 'Товар' ? 'bg-secondary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Товары</button>
+          <button onClick={() => setFeedFilter('Услуга')} className={`px-5 py-2.5 rounded-full font-medium text-sm shadow-sm whitespace-nowrap transition-colors ${feedFilter === 'Услуга' ? 'bg-secondary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Услуги</button>
         </div>
       </section>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* Requests List */}
-        <div className="md:col-span-8 flex flex-col gap-6">
-          {requests.map((req, idx) => (
-            <div key={req.id} className="group cursor-pointer relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-md transition-shadow border border-slate-100">
-              {idx === 0 && (
-                <div className="aspect-[16/9] w-full bg-slate-100 overflow-hidden relative">
-                  <Image src="https://picsum.photos/seed/construction/800/450" alt="Construction site" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                </div>
-              )}
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${req.category === 'Товар' ? 'bg-secondary text-white' : 'bg-primary/10 text-primary'}`}>
-                    {req.category}{req.type ? ` · ${req.type}` : ''}
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium">
-                    {mounted ? new Date(req.createdAt).toLocaleDateString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''} · {req.authorName}
-                  </span>
-                </div>
-                <h3 className="text-xl font-heading font-semibold leading-tight mb-2 text-secondary">{req.title}</h3>
-                <p className="text-slate-600 mb-4 text-sm">{req.description}</p>
-                
-                <div className="flex items-center gap-4 mb-4 text-sm font-medium text-slate-700">
-                  <span className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                    Объем: {req.quantity} {req.unit}
-                  </span>
-                  <span className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                    Бюджет: {req.budget.toLocaleString()} KGS
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-50">
-                  <div className="flex items-center gap-1 text-slate-500">
-                    <MapPin className="w-4 h-4" />
-                    <span className="text-xs font-medium">{req.region}</span>
+      {/* BUYER FEED: Products */}
+      {!isSupplier && (
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {filteredProducts.map((product) => (
+                <Link key={product.id} href={`/product/${product.id}`} className="group bg-white rounded-2xl overflow-hidden hover:shadow-lg transition-all border border-slate-100">
+                  <div className="relative h-40 overflow-hidden">
+                    <Image src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute top-2 left-2 flex flex-col gap-1">
+                      {product.isPromoted && (
+                        <span className="px-2 py-0.5 bg-accent text-secondary text-[10px] font-bold rounded flex items-center gap-1">
+                          <Megaphone className="w-3 h-3" /> РЕКОМЕНДУЕМ
+                        </span>
+                      )}
+                      {product.isNew && (
+                        <span className="px-2 py-0.5 bg-primary text-white text-[10px] font-bold rounded">НОВИНКА</span>
+                      )}
+                    </div>
+                    <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Star className="w-3 h-3 text-accent fill-accent" />
+                      <span className="text-xs font-bold">{product.rating}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs font-medium text-slate-400">{req.responsesCount} откликов</span>
-                    <button className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
-                      {isSupplier ? 'Откликнуться' : 'Подробнее'} <ArrowRight className="w-4 h-4" />
-                    </button>
+                  <div className="p-4">
+                    <div className="flex items-center gap-1 mb-1">
+                      <h4 className="font-heading text-sm font-bold text-secondary truncate">{product.supplierName}</h4>
+                      <BadgeCheck className="w-4 h-4 text-success shrink-0" />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mb-1">
+                      <MapPin className="w-3 h-3 inline" /> {product.region} · {product.groupName}
+                    </p>
+                    <h5 className="font-medium text-slate-800 text-sm mb-1">{product.name}</h5>
+                    <p className="text-lg font-bold text-primary">{product.price.toLocaleString()} KGS / {product.unit}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {filteredProducts.length === 0 && (
+              <div className="text-center py-12">
+                <Tag className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 text-sm">Нет товаров по выбранному фильтру</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="md:col-span-4 rounded-2xl bg-secondary text-white p-6 flex flex-col justify-between shadow-sm relative overflow-hidden h-fit sticky top-20">
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="px-3 py-1 rounded-full bg-accent text-secondary text-[10px] font-bold tracking-wider uppercase">Рекомендуемый</span>
+              </div>
+              <h3 className="text-xl font-heading font-bold mb-3">Арматурная сталь со склада в Бишкеке</h3>
+              <p className="text-sm opacity-90 mb-6 italic">&quot;Лучшие условия на объем от 50 тонн&quot;</p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center gap-2 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-accent" /> А500С все диаметры
+                </li>
+                <li className="flex items-center gap-2 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-accent" /> Доставка за 24 часа
+                </li>
+                <li className="flex items-center gap-2 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-accent" /> Верификация: Уровень 3
+                </li>
+              </ul>
+            </div>
+            <Link href="/catalog" className="w-full py-3 rounded-full bg-primary text-white font-bold text-sm z-10 hover:bg-primary-dark transition-colors text-center block">Смотреть каталог</Link>
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+          </div>
+        </div>
+      )}
+
+      {/* SUPPLIER FEED: Requests */}
+      {isSupplier && (
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-8 flex flex-col gap-6">
+            {filteredRequests.map((req, idx) => (
+              <div key={req.id} className="group cursor-pointer relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-md transition-shadow border border-slate-100">
+                {idx === 0 && (
+                  <div className="aspect-[16/9] w-full bg-slate-100 overflow-hidden relative">
+                    <Image src="https://picsum.photos/seed/construction/800/450" alt="Construction site" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                  </div>
+                )}
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${req.category === 'Товар' ? 'bg-secondary text-white' : 'bg-primary/10 text-primary'}`}>
+                      {req.category}{req.type ? ` · ${req.type}` : ''}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">
+                      {mounted ? new Date(req.createdAt).toLocaleDateString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''} · {req.authorName}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-heading font-semibold leading-tight mb-2 text-secondary">{req.title}</h3>
+                  <p className="text-slate-600 mb-4 text-sm">{req.description}</p>
+                  
+                  <div className="flex items-center gap-4 mb-4 text-sm font-medium text-slate-700">
+                    <span className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                      Объем: {req.quantity} {req.unit}
+                    </span>
+                    <span className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                      Бюджет: {req.budget.toLocaleString()} KGS
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-50">
+                    <div className="flex items-center gap-1 text-slate-500">
+                      <MapPin className="w-4 h-4" />
+                      <span className="text-xs font-medium">{req.region}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-medium text-slate-400">{req.responsesCount} откликов</span>
+                      <Link href="/create" className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
+                        Откликнуться <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Supplier Highlight */}
-        <div className="md:col-span-4 rounded-2xl bg-secondary text-white p-6 flex flex-col justify-between shadow-sm relative overflow-hidden h-fit sticky top-20">
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="px-3 py-1 rounded-full bg-accent text-secondary text-[10px] font-bold tracking-wider uppercase">Рекомендуемый</span>
-            </div>
-            <h3 className="text-xl font-heading font-bold mb-3">Арматурная сталь со склада в Бишкеке</h3>
-            <p className="text-sm opacity-90 mb-6 italic">&quot;Лучшие условия на объем от 50 тонн&quot;</p>
-            <ul className="space-y-3 mb-8">
-              <li className="flex items-center gap-2 text-sm font-medium">
-                <CheckCircle2 className="w-4 h-4 text-accent" /> А500С все диаметры
-              </li>
-              <li className="flex items-center gap-2 text-sm font-medium">
-                <CheckCircle2 className="w-4 h-4 text-accent" /> Доставка за 24 часа
-              </li>
-              <li className="flex items-center gap-2 text-sm font-medium">
-                <CheckCircle2 className="w-4 h-4 text-accent" /> Верификация: Уровень 3
-              </li>
-            </ul>
+            ))}
+            {filteredRequests.length === 0 && (
+              <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
+                <Package className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 text-sm">Нет заявок по выбранному фильтру</p>
+              </div>
+            )}
           </div>
-          <button className="w-full py-3 rounded-full bg-primary text-white font-bold text-sm z-10 hover:bg-primary-dark transition-colors">Запросить прайс</button>
-          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+
+          {/* Supplier Sidebar */}
+          <div className="md:col-span-4 rounded-2xl bg-secondary text-white p-6 flex flex-col justify-between shadow-sm relative overflow-hidden h-fit sticky top-20">
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="px-3 py-1 rounded-full bg-accent text-secondary text-[10px] font-bold tracking-wider uppercase">Рекомендуемый</span>
+              </div>
+              <h3 className="text-xl font-heading font-bold mb-3">Арматурная сталь со склада в Бишкеке</h3>
+              <p className="text-sm opacity-90 mb-6 italic">&quot;Лучшие условия на объем от 50 тонн&quot;</p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center gap-2 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-accent" /> А500С все диаметры
+                </li>
+                <li className="flex items-center gap-2 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-accent" /> Доставка за 24 часа
+                </li>
+                <li className="flex items-center gap-2 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-accent" /> Верификация: Уровень 3
+                </li>
+              </ul>
+            </div>
+            <button className="w-full py-3 rounded-full bg-primary text-white font-bold text-sm z-10 hover:bg-primary-dark transition-colors">Запросить прайс</button>
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* FAB */}
       <Link href={isSupplier ? "/add-product" : "/create"} className="fixed bottom-20 md:bottom-8 right-4 md:right-8 w-14 h-14 bg-primary text-white rounded-full shadow-lg shadow-primary/30 flex items-center justify-center z-40 hover:scale-105 active:scale-95 transition-all">

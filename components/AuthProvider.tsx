@@ -16,6 +16,10 @@ interface AuthContextType {
   updateProfile: (data: Partial<MockUser>) => Promise<void>;
   canAccessChat: boolean;
   canAccessRequests: boolean;
+  // Admin role switching
+  isAdminMode: boolean;
+  adminViewAs: UserRole | null;
+  setAdminViewAs: (role: UserRole | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,6 +33,9 @@ const AuthContext = createContext<AuthContextType>({
   updateProfile: async () => {},
   canAccessChat: false,
   canAccessRequests: false,
+  isAdminMode: false,
+  adminViewAs: null,
+  setAdminViewAs: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -39,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [adminViewAs, setAdminViewAs] = useState<UserRole | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('mockUser');
@@ -57,9 +65,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
+  // Admin role switching: override userData.role when viewing as another role
+  const isAdminMode = user?.role === 'admin';
+  const effectiveUserData: MockUser | null = userData && adminViewAs
+    ? { ...userData, role: adminViewAs }
+    : userData;
+
   // Access gates — chat and requests require verification level >= 2
-  const canAccessChat = (userData?.verificationLevel ?? 0) >= 2;
-  const canAccessRequests = (userData?.verificationLevel ?? 0) >= 2;
+  const canAccessChat = (effectiveUserData?.verificationLevel ?? 0) >= 2;
+  const canAccessRequests = (effectiveUserData?.verificationLevel ?? 0) >= 2;
 
   const openAuthModal = () => setIsAuthModalOpen(true);
 
@@ -110,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setUser(null);
     setUserData(null);
+    setAdminViewAs(null);
     localStorage.removeItem('mockUser');
   };
 
@@ -130,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, openAuthModal, loginWithPhone, loginWithEmail, logout, updateProfile, canAccessChat, canAccessRequests }}>
+    <AuthContext.Provider value={{ user, userData: effectiveUserData, loading, openAuthModal, loginWithPhone, loginWithEmail, logout, updateProfile, canAccessChat, canAccessRequests, isAdminMode, adminViewAs, setAdminViewAs }}>
       {children}
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       {user && (

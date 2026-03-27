@@ -1,18 +1,28 @@
 'use client';
-import { Settings, Bell, Shield, CircleHelp, LogOut, ChevronRight, Star, Package, MapPin, Building2, LogIn, Phone, FileText, CheckCircle2, Edit3, Mail, BadgeCheck, Crown, CreditCard, ArrowUpRight, BarChart3 } from 'lucide-react';
+import { Settings, Bell, Shield, CircleHelp, LogOut, ChevronRight, Star, Package, MapPin, Building2, LogIn, Phone, FileText, CheckCircle2, Edit3, Mail, BadgeCheck, Crown, CreditCard, ArrowUpRight, BarChart3, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
 import { useState } from 'react';
-import { getVerificationLabel, getVerificationColor, subscriptionPlans, type VerificationLevel } from '@/lib/mockDb';
+import { getVerificationLabel, getVerificationColor, subscriptionPlans, type VerificationLevel, VERIFICATION_CONFIG, sendEmailVerification, verifyEmail, submitInnVerification, submitLicenseVerification } from '@/lib/mockDb';
 import ChangePhoneModal from '@/components/ChangePhoneModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import ProfileEditor from '@/components/ProfileEditor';
+
+type VerifyStep = null | 'email' | 'email-code' | 'inn' | 'license';
 
 export default function ProfilePage() {
   const { user, userData, logout, openAuthModal, updateProfile } = useAuth();
   const [isChangingPhone, setIsChangingPhone] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  // Verification flow state
+  const [verifyStep, setVerifyStep] = useState<VerifyStep>(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [codeInput, setCodeInput] = useState('');
+  const [innInput, setInnInput] = useState('');
+  const [licenseInput, setLicenseInput] = useState('');
 
   if (!user) {
     return (
@@ -42,6 +52,55 @@ export default function ProfilePage() {
 
   const handleProfileSave = (updatedData: any) => {
     window.location.reload();
+  };
+
+  // Verification handlers
+  const startEmailVerification = async () => {
+    if (!emailInput.includes('@')) { setVerifyError('Введите корректный email'); return; }
+    setVerifyLoading(true);
+    setVerifyError('');
+    try {
+      await sendEmailVerification(emailInput);
+      await updateProfile({ email: emailInput });
+      setVerifyStep('email-code');
+    } catch { setVerifyError('Ошибка отправки'); }
+    setVerifyLoading(false);
+  };
+
+  const confirmEmailCode = async () => {
+    setVerifyLoading(true);
+    setVerifyError('');
+    try {
+      const ok = await verifyEmail(emailInput, codeInput);
+      if (!ok) { setVerifyError(`Неверный код${VERIFICATION_CONFIG.useMock ? ` (подсказка: ${VERIFICATION_CONFIG.mockOtpCode})` : ''}`); setVerifyLoading(false); return; }
+      await updateProfile({ emailVerified: true });
+      setVerifyStep(null); setCodeInput('');
+    } catch { setVerifyError('Ошибка верификации'); }
+    setVerifyLoading(false);
+  };
+
+  const confirmInn = async () => {
+    if (innInput.length < 10) { setVerifyError('ИНН должен содержать минимум 10 цифр'); return; }
+    setVerifyLoading(true);
+    setVerifyError('');
+    try {
+      await submitInnVerification(user.uid, innInput);
+      await updateProfile({ inn: innInput });
+      setVerifyStep(null); setInnInput('');
+    } catch { setVerifyError('Ошибка проверки ИНН'); }
+    setVerifyLoading(false);
+  };
+
+  const confirmLicense = async () => {
+    if (!licenseInput.trim()) { setVerifyError('Введите номер лицензии'); return; }
+    setVerifyLoading(true);
+    setVerifyError('');
+    try {
+      await submitLicenseVerification(user.uid, licenseInput);
+      await updateProfile({ licenses: [...(userData?.licenses || []), licenseInput] });
+      setVerifyStep(null); setLicenseInput('');
+    } catch { setVerifyError('Ошибка проверки лицензии'); }
+    setVerifyLoading(false);
   };
 
   const verLevel = (userData?.verificationLevel ?? 0) as VerificationLevel;
@@ -109,7 +168,12 @@ export default function ProfilePage() {
 
       {/* Verification Progress */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
-        <h3 className="text-lg font-bold text-secondary flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> Верификация</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-secondary flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> Верификация</h3>
+          {VERIFICATION_CONFIG.useMock && (
+            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">ТЕСТОВЫЙ РЕЖИМ</span>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           {[0, 1, 2, 3].map(lvl => (
             <div key={lvl} className={`flex-1 h-2 rounded-full transition-all ${lvl <= verLevel ? 'bg-primary' : 'bg-slate-200'}`} />
@@ -125,21 +189,21 @@ export default function ProfilePage() {
             <Mail className="w-4 h-4 mb-1" /> <span className="font-bold">Ур. 1</span>
             <p className="text-slate-500 mt-1">Телефон + Email</p>
             {verLevel >= 1 ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" /> : (
-              <button onClick={() => setIsEditingProfile(true)} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
+              <button onClick={() => { setVerifyStep('email'); setVerifyError(''); setEmailInput(userData?.email || ''); }} className="text-primary font-bold mt-1 hover:underline">Подтвердить</button>
             )}
           </div>
           <div className={`p-3 rounded-xl border ${verLevel >= 2 ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-slate-100'}`}>
             <FileText className="w-4 h-4 mb-1" /> <span className="font-bold">Ур. 2</span>
             <p className="text-slate-500 mt-1">ИНН / Паспорт</p>
             {verLevel >= 2 ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" /> : (
-              <button onClick={() => setIsEditingProfile(true)} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
+              <button onClick={() => { setVerifyStep('inn'); setVerifyError(''); setInnInput(userData?.inn || ''); }} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
             )}
           </div>
           <div className={`p-3 rounded-xl border ${verLevel >= 3 ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-slate-100'}`}>
             <BadgeCheck className="w-4 h-4 mb-1" /> <span className="font-bold">Ур. 3</span>
             <p className="text-slate-500 mt-1">Лицензии</p>
             {verLevel >= 3 ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" /> : (
-              <button onClick={() => setIsEditingProfile(true)} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
+              <button onClick={() => { setVerifyStep('license'); setVerifyError(''); }} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
             )}
           </div>
         </div>
@@ -149,6 +213,75 @@ export default function ProfilePage() {
           </p>
         )}
       </div>
+
+      {/* Verification Modal */}
+      {verifyStep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl relative">
+            <button onClick={() => setVerifyStep(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            
+            {verifyStep === 'email' && (
+              <>
+                <h4 className="font-heading font-bold text-lg text-secondary">Подтверждение Email</h4>
+                <p className="text-sm text-slate-500">Введите вашу почту. Мы отправим код подтверждения.</p>
+                {VERIFICATION_CONFIG.useMock && (
+                  <p className="text-xs bg-blue-50 text-blue-600 p-2 rounded-lg">Тестовый режим: код подтверждения — <strong>{VERIFICATION_CONFIG.mockOtpCode}</strong></p>
+                )}
+                <input type="email" value={emailInput} onChange={e => setEmailInput(e.target.value)} placeholder="your@email.com" className="w-full h-12 px-4 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20" />
+                {verifyError && <p className="text-danger text-sm">{verifyError}</p>}
+                <button onClick={startEmailVerification} disabled={verifyLoading} className="w-full h-12 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {verifyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Отправить код'}
+                </button>
+              </>
+            )}
+
+            {verifyStep === 'email-code' && (
+              <>
+                <h4 className="font-heading font-bold text-lg text-secondary">Введите код</h4>
+                <p className="text-sm text-slate-500">Код отправлен на <strong>{emailInput}</strong></p>
+                {VERIFICATION_CONFIG.useMock && (
+                  <p className="text-xs bg-blue-50 text-blue-600 p-2 rounded-lg">Тестовый режим: введите <strong>{VERIFICATION_CONFIG.mockOtpCode}</strong></p>
+                )}
+                <input type="text" value={codeInput} onChange={e => setCodeInput(e.target.value)} placeholder="Код подтверждения" maxLength={6} className="w-full h-12 px-4 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-center text-xl tracking-widest" />
+                {verifyError && <p className="text-danger text-sm">{verifyError}</p>}
+                <button onClick={confirmEmailCode} disabled={verifyLoading} className="w-full h-12 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {verifyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Подтвердить'}
+                </button>
+              </>
+            )}
+
+            {verifyStep === 'inn' && (
+              <>
+                <h4 className="font-heading font-bold text-lg text-secondary">Верификация ИНН</h4>
+                <p className="text-sm text-slate-500">Введите ваш ИНН для подтверждения личности.</p>
+                {VERIFICATION_CONFIG.useMock && (
+                  <p className="text-xs bg-blue-50 text-blue-600 p-2 rounded-lg">Тестовый режим: любой ИНН от 10 цифр будет принят</p>
+                )}
+                <input type="text" value={innInput} onChange={e => setInnInput(e.target.value.replace(/\D/g, ''))} placeholder="Введите ИНН (от 10 цифр)" maxLength={14} className="w-full h-12 px-4 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20" />
+                {verifyError && <p className="text-danger text-sm">{verifyError}</p>}
+                <button onClick={confirmInn} disabled={verifyLoading} className="w-full h-12 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {verifyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Подтвердить ИНН'}
+                </button>
+              </>
+            )}
+
+            {verifyStep === 'license' && (
+              <>
+                <h4 className="font-heading font-bold text-lg text-secondary">Верификация лицензии</h4>
+                <p className="text-sm text-slate-500">Введите номер лицензии или сертификата СРО.</p>
+                {VERIFICATION_CONFIG.useMock && (
+                  <p className="text-xs bg-blue-50 text-blue-600 p-2 rounded-lg">Тестовый режим: любой номер будет принят</p>
+                )}
+                <input type="text" value={licenseInput} onChange={e => setLicenseInput(e.target.value)} placeholder="Например: СРО-12345" className="w-full h-12 px-4 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20" />
+                {verifyError && <p className="text-danger text-sm">{verifyError}</p>}
+                <button onClick={confirmLicense} disabled={verifyLoading} className="w-full h-12 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {verifyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Подтвердить лицензию'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Subscription Card (for suppliers) */}
       {isSupplier && (

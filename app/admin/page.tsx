@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { getAllMockUsers, updateMockUser, getVerificationLabel, getVerificationColor, type MockUser, type VerificationLevel } from '@/lib/mockDb';
-import { Loader2, CheckCircle2, XCircle, ShieldAlert, BadgeCheck, Users, ArrowUp } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ShieldAlert, BadgeCheck, Users, ArrowUp, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function AdminPage() {
-  const { user, userData, loading: authLoading } = useAuth();
+  const { user, userData, loading: authLoading, isAdminMode, adminViewAs, setAdminViewAs } = useAuth();
   const [allUsers, setAllUsers] = useState<MockUser[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (authLoading) return;
     
-    if (!user || userData?.role !== 'admin') {
+    if (!user || user.role !== 'admin') {
       router.push('/');
       return;
     }
@@ -39,7 +39,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!user || userData?.role !== 'admin') return null;
+  if (!user || user.role !== 'admin') return null;
 
   const pendingUsers = allUsers.filter(u => u.verificationLevel < 2 && (u.inn || u.email));
   const verifiedUsers = allUsers.filter(u => u.verificationLevel >= 2);
@@ -49,6 +49,54 @@ export default function AdminPage() {
       <div className="flex items-center gap-3 mb-8">
         <ShieldAlert className="w-8 h-8 text-primary" />
         <h1 className="text-3xl font-heading font-bold text-secondary">Панель администратора</h1>
+      </div>
+
+      {/* Role Switcher */}
+      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <Eye className="w-5 h-5 text-primary" />
+          <h3 className="font-bold text-secondary">Просмотр как роль</h3>
+        </div>
+        <p className="text-sm text-slate-500 mb-3">Переключитесь на другую роль, чтобы увидеть приложение глазами пользователя.</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setAdminViewAs(null)}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              !adminViewAs ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Администратор
+          </button>
+          <button
+            onClick={() => setAdminViewAs('consumer')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              adminViewAs === 'consumer' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Покупатель
+          </button>
+          <button
+            onClick={() => setAdminViewAs('supplier')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              adminViewAs === 'supplier' ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Поставщик
+          </button>
+          <button
+            onClick={() => setAdminViewAs('developer')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              adminViewAs === 'developer' ? 'bg-purple-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Застройщик
+          </button>
+        </div>
+        {adminViewAs && (
+          <p className="mt-3 text-xs text-amber-600 bg-amber-50 p-2 rounded-lg">
+            Вы просматриваете приложение как <strong>{adminViewAs === 'consumer' ? 'Покупатель' : adminViewAs === 'supplier' ? 'Поставщик' : 'Застройщик'}</strong>. Навигация и лента изменились.
+          </p>
+        )}
       </div>
 
       {/* Stats */}
