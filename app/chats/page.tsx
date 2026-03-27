@@ -1,15 +1,20 @@
 'use client';
 
 import Image from 'next/image';
-import { Search, Check, CheckCheck, MessageSquare } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Search, Check, CheckCheck, MessageSquare, Shield, Send, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
-import { getMockChats } from '@/lib/mockDb';
+import { getMockChats, getChatMessages, sendChatMessage, type MockChatMessage } from '@/lib/mockDb';
 
 export default function ChatsPage() {
-  const { user } = useAuth();
+  const { user, canAccessChat, openAuthModal } = useAuth();
   const [chats, setChats] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<MockChatMessage[]>([]);
+  const [newMsg, setNewMsg] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -18,16 +23,110 @@ export default function ChatsPage() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (activeChatId) {
+      setMessages(getChatMessages(activeChatId));
+    }
+  }, [activeChatId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   if (!user) {
     return (
       <div className="max-w-3xl mx-auto px-4 pt-20 pb-24 text-center">
         <MessageSquare className="w-16 h-16 text-slate-300 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-secondary mb-4">Войдите в систему</h1>
-        <p className="text-slate-600">Чтобы просматривать сообщения, необходимо авторизоваться.</p>
+        <p className="text-slate-600 mb-6">Чтобы просматривать сообщения, необходимо авторизоваться.</p>
+        <button onClick={openAuthModal} className="bg-primary text-white px-6 py-3 rounded-xl font-bold">Войти</button>
       </div>
     );
   }
 
+  if (!canAccessChat) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 pt-20 pb-24 text-center">
+        <Shield className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+        <h1 className="text-2xl font-bold text-secondary mb-2">Требуется верификация</h1>
+        <p className="text-slate-500 mb-2">Чат доступен после верификации уровня 2</p>
+        <p className="text-sm text-slate-400 mb-6">Заполните ИНН / паспортные данные в профиле</p>
+        <Link href="/profile" className="bg-primary text-white px-6 py-3 rounded-xl font-bold inline-block">Перейти в профиль</Link>
+      </div>
+    );
+  }
+
+  const handleSend = () => {
+    if (!newMsg.trim() || !activeChatId || !user) return;
+    sendChatMessage(activeChatId, user.uid, newMsg.trim());
+    setMessages(getChatMessages(activeChatId));
+    setChats(getMockChats(user.uid));
+    setNewMsg('');
+  };
+
+  const activeChat = chats.find(c => c.id === activeChatId);
+
+  // Chat thread view
+  if (activeChatId && activeChat) {
+    return (
+      <main className="max-w-3xl mx-auto px-4 pt-4 pb-24 h-screen flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+          <button onClick={() => setActiveChatId(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          </button>
+          <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden relative">
+            <Image src={activeChat.otherUser.avatar} alt={activeChat.otherUser.name} fill className="object-cover" />
+          </div>
+          <div>
+            <h3 className="font-heading font-bold text-secondary text-sm">{activeChat.otherUser.name}</h3>
+            <span className="text-xs text-slate-500 capitalize">{activeChat.otherUser.role === 'supplier' ? 'Поставщик' : 'Покупатель'}</span>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto py-4 space-y-3">
+          {messages.map(msg => {
+            const isMe = msg.senderId === user.uid;
+            return (
+              <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[75%] px-4 py-3 rounded-2xl ${isMe ? 'bg-primary text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}`}>
+                  <p className="text-sm">{msg.text}</p>
+                  <span className={`text-[10px] mt-1 block ${isMe ? 'text-white/70' : 'text-slate-400'}`}>
+                    {mounted ? new Date(msg.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="pt-3 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newMsg}
+              onChange={(e) => setNewMsg(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Написать сообщение..."
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!newMsg.trim()}
+              className="w-11 h-11 rounded-xl bg-primary text-white flex items-center justify-center disabled:opacity-50 hover:bg-primary-dark transition-colors"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Chat list view
   return (
     <main className="max-w-3xl mx-auto px-4 pt-6 pb-24 h-screen flex flex-col">
       <div className="mb-6">
@@ -41,11 +140,7 @@ export default function ChatsPage() {
         </div>
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-          <input 
-            type="text" 
-            placeholder="Поиск сообщений..." 
-            className="w-full h-12 pl-12 pr-4 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 shadow-sm outline-none" 
-          />
+          <input type="text" placeholder="Поиск сообщений..." className="w-full h-12 pl-12 pr-4 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 shadow-sm outline-none" />
         </div>
       </div>
 
@@ -57,7 +152,7 @@ export default function ChatsPage() {
           </div>
         ) : (
           chats.map((chat) => (
-            <div key={chat.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex items-center gap-4">
+            <div key={chat.id} onClick={() => setActiveChatId(chat.id)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex items-center gap-4">
               <div className="relative shrink-0">
                 <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden relative">
                   <Image src={chat.otherUser.avatar} alt={chat.otherUser.name} fill className="object-cover" />

@@ -3,7 +3,7 @@ import { Bell, User, LogIn, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import Image from 'next/image';
+
 import { useState, useEffect, useRef } from 'react';
 import { getMockNotifications, markNotificationAsRead } from '@/lib/mockDb';
 
@@ -44,11 +44,7 @@ export default function Header() {
       <div className="flex items-center gap-3">
         {user ? (
           <Link href="/profile" className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden border border-primary/20 relative">
-            {user.photoURL ? (
-              <Image src={user.photoURL} alt={user.displayName || 'User'} fill className="object-cover" />
-            ) : (
-              <User className="w-6 h-6 text-primary" />
-            )}
+            <User className="w-6 h-6 text-primary" />
           </Link>
         ) : (
           <button onClick={openAuthModal} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 hover:bg-slate-200 transition-colors">
@@ -62,14 +58,17 @@ export default function Header() {
       
       <nav className="hidden md:flex items-center gap-6">
         <Link href="/" className={`text-sm font-medium transition-colors ${pathname === '/' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Лента</Link>
+        <Link href="/catalog" className={`text-sm font-medium transition-colors ${pathname === '/catalog' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Каталог</Link>
         
-        {userData?.role === 'supplier' ? (
-          <Link href="/add-product" className={`text-sm font-medium transition-colors ${pathname === '/add-product' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Добавить товар</Link>
+        {(userData?.role === 'supplier' || userData?.role === 'developer') ? (
+          <>
+            <Link href="/dashboard" className={`text-sm font-medium transition-colors ${pathname === '/dashboard' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Дашборд</Link>
+            <Link href="/add-product" className={`text-sm font-medium transition-colors ${pathname === '/add-product' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Добавить товар</Link>
+          </>
         ) : (
-          <Link href="/create" className={`text-sm font-medium transition-colors ${pathname === '/create' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Создать заявку</Link>
+          <Link href="/create" className={`text-sm font-medium transition-colors ${pathname === '/create' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Заявки</Link>
         )}
         
-        <Link href="/catalog" className={`text-sm font-medium transition-colors ${pathname === '/catalog' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Каталог</Link>
         <Link href="/chats" className={`text-sm font-medium transition-colors ${pathname === '/chats' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Чаты</Link>
         {user && userData?.role === 'admin' && (
           <Link href="/admin" className={`text-sm font-medium transition-colors ${pathname === '/admin' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Админ</Link>

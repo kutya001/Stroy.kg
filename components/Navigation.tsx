@@ -1,5 +1,5 @@
 'use client';
-import { Home, PlusCircle, Store, MessageSquare, User, PackagePlus } from 'lucide-react';
+import { Home, PlusCircle, Store, MessageSquare, User, PackagePlus, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
@@ -8,19 +8,23 @@ export default function Navigation() {
   const pathname = usePathname();
   const { userData } = useAuth();
 
-  const isSupplier = userData?.role === 'supplier';
+  const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
 
-  const navItems = [
-    { href: '/', icon: Home, label: 'Главная' },
-    { href: '/catalog', icon: Store, label: 'Каталог' },
-    { 
-      href: isSupplier ? '/add-product' : '/create', 
-      icon: isSupplier ? PackagePlus : PlusCircle, 
-      label: isSupplier ? 'Добавить' : 'Заявки' 
-    },
-    { href: '/chats', icon: MessageSquare, label: 'Чат' },
-    { href: '/profile', icon: User, label: 'Профиль' },
-  ];
+  const navItems = isSupplier
+    ? [
+        { href: '/', icon: Home, label: 'Главная' },
+        { href: '/catalog', icon: Store, label: 'Каталог' },
+        { href: '/dashboard', icon: BarChart3, label: 'Дашборд' },
+        { href: '/chats', icon: MessageSquare, label: 'Чат' },
+        { href: '/profile', icon: User, label: 'Профиль' },
+      ]
+    : [
+        { href: '/', icon: Home, label: 'Главная' },
+        { href: '/catalog', icon: Store, label: 'Каталог' },
+        { href: '/create', icon: PlusCircle, label: 'Заявки' },
+        { href: '/chats', icon: MessageSquare, label: 'Чат' },
+        { href: '/profile', icon: User, label: 'Профиль' },
+      ];
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 pb-safe h-16 bg-white/90 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] rounded-t-2xl">

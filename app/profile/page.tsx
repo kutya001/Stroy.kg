@@ -1,14 +1,15 @@
 'use client';
-import Image from 'next/image';
-import { Settings, Bell, Shield, CircleHelp, LogOut, ChevronRight, Star, Package, MapPin, Building2, LogIn, Phone, FileText, CheckCircle2, Edit3, Calendar, Home, FolderOpen, Award, Briefcase } from 'lucide-react';
+import { Settings, Bell, Shield, CircleHelp, LogOut, ChevronRight, Star, Package, MapPin, Building2, LogIn, Phone, FileText, CheckCircle2, Edit3, Mail, BadgeCheck, Crown, CreditCard, ArrowUpRight, BarChart3 } from 'lucide-react';
+import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
 import { useState } from 'react';
+import { getVerificationLabel, getVerificationColor, subscriptionPlans, type VerificationLevel } from '@/lib/mockDb';
 import ChangePhoneModal from '@/components/ChangePhoneModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import ProfileEditor from '@/components/ProfileEditor';
 
 export default function ProfilePage() {
-  const { user, userData, logout, openAuthModal } = useAuth();
+  const { user, userData, logout, openAuthModal, updateProfile } = useAuth();
   const [isChangingPhone, setIsChangingPhone] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -34,6 +35,7 @@ export default function ProfilePage() {
       case 'supplier': return 'Поставщик';
       case 'developer': return 'Застройщик';
       case 'consumer': return 'Покупатель';
+      case 'admin': return 'Администратор';
       default: return 'Пользователь';
     }
   };
@@ -41,6 +43,10 @@ export default function ProfilePage() {
   const handleProfileSave = (updatedData: any) => {
     window.location.reload();
   };
+
+  const verLevel = (userData?.verificationLevel ?? 0) as VerificationLevel;
+  const currentPlan = subscriptionPlans.find(p => p.tier === (userData?.subscription || 'FREE'));
+  const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-6 pb-24 space-y-6">
@@ -54,37 +60,28 @@ export default function ProfilePage() {
 
       {/* User Info Card */}
       <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-6 relative overflow-hidden">
-        {userData?.verificationStatus === 'verified' && (
-          <div className="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> Верифицирован
-          </div>
-        )}
-        {userData?.verificationStatus === 'pending' && (
-          <div className="absolute top-0 right-0 bg-yellow-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1">
-            <CircleHelp className="w-3 h-3" /> На модерации
-          </div>
-        )}
-        {userData?.verificationStatus === 'rejected' && (
-          <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1">
-            <Shield className="w-3 h-3" /> Отклонен
-          </div>
-        )}
+        <div className={`absolute top-0 right-0 text-white text-xs font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 ${verLevel >= 2 ? 'bg-green-500' : verLevel === 1 ? 'bg-amber-500' : 'bg-slate-400'}`}>
+          <BadgeCheck className="w-3 h-3" /> Уровень {verLevel}
+        </div>
         <div className="w-24 h-24 rounded-full bg-slate-100 relative overflow-hidden border-4 border-white shadow-md shrink-0">
-          {user.photoURL ? (
-            <Image src={user.photoURL} alt={user.displayName || 'User'} fill className="object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold text-2xl">
-              {user.phoneNumber ? user.phoneNumber.slice(-2) : 'U'}
-            </div>
-          )}
+          <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold text-2xl">
+            {user.name ? user.name.charAt(0).toUpperCase() : user.phone?.slice(-2) || 'U'}
+          </div>
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-heading font-bold text-secondary mb-1 truncate">{userData?.name || user.phoneNumber}</h2>
+          <h2 className="text-2xl font-heading font-bold text-secondary mb-1 truncate">{userData?.name || user.phone}</h2>
           <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mb-3">
-            {(userData?.role === 'developer' || userData?.role === 'supplier') && (
+            {isSupplier && (
               <div className="flex items-center gap-1">
                 <Building2 className="w-4 h-4" />
                 <span className="truncate">{userData?.companyName || 'Компания не указана'}</span>
+              </div>
+            )}
+            {userData?.email && (
+              <div className="flex items-center gap-1">
+                <Mail className="w-4 h-4" />
+                <span className="truncate">{userData.email}</span>
+                {userData.emailVerified && <CheckCircle2 className="w-3 h-3 text-green-500" />}
               </div>
             )}
             {userData?.inn && (
@@ -93,125 +90,121 @@ export default function ProfilePage() {
                 <span>ИНН: {userData.inn}</span>
               </div>
             )}
-            <div className="flex items-center gap-1">
-              <MapPin className="w-4 h-4" />
-              <span>{userData?.region || 'Кыргызстан'}</span>
-            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider rounded-full">
-              {getRoleLabel(userData?.role)}
+              {getRoleLabel(userData?.role || 'consumer')}
             </span>
-            {userData?.subscription && (
+            <span className={`inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full ${getVerificationColor(verLevel)}`}>
+              {getVerificationLabel(verLevel)}
+            </span>
+            {isSupplier && (
               <span className="inline-block px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold uppercase tracking-wider rounded-full">
-                {userData.subscription} Подписка
+                <Crown className="w-3 h-3 inline mr-1" />{currentPlan?.name || 'Бесплатный'}
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Detailed Info Section */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
-        <h3 className="text-lg font-bold text-secondary border-b pb-2">Детальная информация</h3>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {userData?.role === 'consumer' && (
-            <>
-              <div>
-                <div className="text-sm text-slate-500 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4" /> Дата рождения</div>
-                <div className="font-medium">{userData?.dateOfBirth || 'Не указана'}</div>
-              </div>
-              <div>
-                <div className="text-sm text-slate-500 mb-1 flex items-center gap-2"><Home className="w-4 h-4" /> Тип жилья</div>
-                <div className="font-medium">{userData?.housingType || 'Не указан'}</div>
-              </div>
-              <div className="sm:col-span-2">
-                <div className="text-sm text-slate-500 mb-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> Адрес</div>
-                <div className="font-medium">{userData?.address || 'Не указан'}</div>
-              </div>
-            </>
-          )}
-
-          {userData?.role === 'supplier' && (
-            <div className="sm:col-span-2">
-              <div className="text-sm text-slate-500 mb-2 flex items-center gap-2"><Briefcase className="w-4 h-4" /> Категории деятельности</div>
-              <div className="flex flex-wrap gap-2">
-                {userData?.categories?.length > 0 ? (
-                  userData.categories.map((cat: string) => (
-                    <span key={cat} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-medium">{cat}</span>
-                  ))
-                ) : (
-                  <span className="text-slate-400 italic">Категории не выбраны</span>
-                )}
-              </div>
-            </div>
-          )}
+      {/* Verification Progress */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+        <h3 className="text-lg font-bold text-secondary flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> Верификация</h3>
+        <div className="flex items-center gap-1">
+          {[0, 1, 2, 3].map(lvl => (
+            <div key={lvl} className={`flex-1 h-2 rounded-full transition-all ${lvl <= verLevel ? 'bg-primary' : 'bg-slate-200'}`} />
+          ))}
         </div>
-
-        {/* Files Section */}
-        {(userData?.role === 'developer' || userData?.role === 'supplier') && (
-          <div className="space-y-4 pt-4 border-t">
-            {userData?.role === 'developer' && (
-              <>
-                <div>
-                  <div className="text-sm text-slate-500 mb-2 flex items-center gap-2"><FileText className="w-4 h-4" /> Документы компании</div>
-                  {userData?.documents?.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {userData.documents.map((doc: any, i: number) => (
-                        <a key={i} href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <FileText className="w-4 h-4" /> {doc.name}
-                        </a>
-                      ))}
-                    </div>
-                  ) : <span className="text-slate-400 italic text-sm">Нет загруженных документов</span>}
-                </div>
-                <div>
-                  <div className="text-sm text-slate-500 mb-2 flex items-center gap-2"><FolderOpen className="w-4 h-4" /> Проекты</div>
-                  {userData?.projects?.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {userData.projects.map((proj: any, i: number) => (
-                        <a key={i} href={proj.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <FolderOpen className="w-4 h-4" /> {proj.name}
-                        </a>
-                      ))}
-                    </div>
-                  ) : <span className="text-slate-400 italic text-sm">Нет загруженных проектов</span>}
-                </div>
-              </>
-            )}
-
-            {userData?.role === 'supplier' && (
-              <div>
-                <div className="text-sm text-slate-500 mb-2 flex items-center gap-2"><Award className="w-4 h-4" /> Сертификаты</div>
-                {userData?.certificates?.length > 0 ? (
-                  <div className="flex flex-col gap-2">
-                    {userData.certificates.map((cert: any, i: number) => (
-                      <a key={i} href={cert.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <Award className="w-4 h-4" /> {cert.name}
-                      </a>
-                    ))}
-                  </div>
-                ) : <span className="text-slate-400 italic text-sm">Нет загруженных сертификатов</span>}
-              </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className={`p-3 rounded-xl border ${verLevel >= 0 ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-slate-100'}`}>
+            <Phone className="w-4 h-4 mb-1" /> <span className="font-bold">Ур. 0</span>
+            <p className="text-slate-500 mt-1">Регистрация</p>
+            {verLevel >= 0 && <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" />}
+          </div>
+          <div className={`p-3 rounded-xl border ${verLevel >= 1 ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-slate-100'}`}>
+            <Mail className="w-4 h-4 mb-1" /> <span className="font-bold">Ур. 1</span>
+            <p className="text-slate-500 mt-1">Телефон + Email</p>
+            {verLevel >= 1 ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" /> : (
+              <button onClick={() => setIsEditingProfile(true)} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
             )}
           </div>
+          <div className={`p-3 rounded-xl border ${verLevel >= 2 ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-slate-100'}`}>
+            <FileText className="w-4 h-4 mb-1" /> <span className="font-bold">Ур. 2</span>
+            <p className="text-slate-500 mt-1">ИНН / Паспорт</p>
+            {verLevel >= 2 ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" /> : (
+              <button onClick={() => setIsEditingProfile(true)} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
+            )}
+          </div>
+          <div className={`p-3 rounded-xl border ${verLevel >= 3 ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-slate-100'}`}>
+            <BadgeCheck className="w-4 h-4 mb-1" /> <span className="font-bold">Ур. 3</span>
+            <p className="text-slate-500 mt-1">Лицензии</p>
+            {verLevel >= 3 ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" /> : (
+              <button onClick={() => setIsEditingProfile(true)} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
+            )}
+          </div>
+        </div>
+        {verLevel < 2 && (
+          <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-xl">
+            Для доступа к чатам и заявкам необходим уровень верификации 2 или выше.
+          </p>
         )}
       </div>
+
+      {/* Subscription Card (for suppliers) */}
+      {isSupplier && (
+        <div className="bg-gradient-to-br from-secondary to-secondary/80 rounded-3xl p-6 text-white shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-heading font-bold text-lg flex items-center gap-2"><CreditCard className="w-5 h-5" /> Подписка</h3>
+            <span className="bg-accent text-secondary px-3 py-1 rounded-full text-xs font-bold">{currentPlan?.name}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <div className="text-sm text-slate-300">Стоимость</div>
+              <div className="text-xl font-bold">{currentPlan?.price === 0 ? 'Бесплатно' : `${currentPlan?.price.toLocaleString()} сом/мес`}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-300">Лимит товаров</div>
+              <div className="text-xl font-bold">{currentPlan?.maxProducts === Infinity ? '∞' : currentPlan?.maxProducts}</div>
+            </div>
+          </div>
+          <ul className="text-sm text-slate-300 space-y-1 mb-4">
+            {currentPlan?.features.map((f, i) => <li key={i} className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-accent" />{f}</li>)}
+          </ul>
+          {currentPlan?.tier !== 'ENTERPRISE' && (
+            <button className="w-full py-3 bg-accent text-secondary font-bold rounded-xl hover:bg-accent/90 transition-colors flex items-center justify-center gap-2">
+              <ArrowUpRight className="w-4 h-4" /> Повысить тариф
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Quick Links for suppliers */}
+      {isSupplier && (
+        <div className="grid grid-cols-2 gap-4">
+          <Link href="/dashboard" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center hover:shadow-md transition-shadow">
+            <BarChart3 className="w-6 h-6 text-primary mx-auto mb-2" />
+            <div className="text-sm font-bold text-secondary">Дашборд</div>
+          </Link>
+          <Link href="/add-product" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center hover:shadow-md transition-shadow">
+            <Package className="w-6 h-6 text-primary mx-auto mb-2" />
+            <div className="text-sm font-bold text-secondary">Мои товары</div>
+          </Link>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
-          <div className="text-2xl font-heading font-bold text-secondary mb-1">0</div>
-          <div className="text-xs text-slate-500 font-medium">Активных заявок</div>
-        </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
-          <div className="text-2xl font-heading font-bold text-secondary mb-1">0</div>
+          <div className="text-2xl font-heading font-bold text-secondary mb-1">{userData?.completedOrders || 0}</div>
           <div className="text-xs text-slate-500 font-medium">Сделок</div>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+          <div className="text-2xl font-heading font-bold text-secondary mb-1">{userData?.chatRequests || 0}</div>
+          <div className="text-xs text-slate-500 font-medium">Обращений</div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
           <div className="flex items-center justify-center gap-1 text-2xl font-heading font-bold text-secondary mb-1">
-            {userData?.rating || '5.0'} <Star className="w-5 h-5 text-accent fill-accent" />
+            5.0 <Star className="w-5 h-5 text-accent fill-accent" />
           </div>
           <div className="text-xs text-slate-500 font-medium">Рейтинг</div>
         </div>
@@ -240,7 +233,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <span className="font-medium text-secondary block">Номер телефона</span>
-              <span className="text-xs text-slate-500">{user.phoneNumber || 'Не указан'}</span>
+              <span className="text-xs text-slate-500">{user.phone || 'Не указан'}</span>
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-400" />

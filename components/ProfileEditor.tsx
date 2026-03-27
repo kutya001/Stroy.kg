@@ -30,7 +30,7 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
   const [projects, setProjects] = useState<{name: string, url: string}[]>(userData?.projects || []);
   const [certificates, setCertificates] = useState<{name: string, url: string}[]>(userData?.certificates || []);
   const [categories, setCategories] = useState<string[]>(userData?.categories || []);
-  const [photoURL, setPhotoURL] = useState<string>(user?.photoURL || '');
+  const [photoURL, setPhotoURL] = useState<string>('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const role = userData?.role;
