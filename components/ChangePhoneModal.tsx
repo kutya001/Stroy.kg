@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Phone, ShieldCheck, Loader2, ArrowRight } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from './AuthProvider';
 
 interface ChangePhoneModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface ChangePhoneModalProps {
 }
 
 export default function ChangePhoneModal({ isOpen, onClose }: ChangePhoneModalProps) {
+  const { updateProfile } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
@@ -43,20 +44,15 @@ export default function ChangePhoneModal({ isOpen, onClose }: ChangePhoneModalPr
     setError('');
 
     try {
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-
-      const { error: updateError } = await supabase.auth.updateUser({
-        phone: formattedPhone
-      });
-
-      if (updateError) throw updateError;
-      
-      setStep('otp');
-      setTimer(300);
+      // Mock SMS sending
+      setTimeout(() => {
+        setStep('otp');
+        setTimer(300);
+        setLoading(false);
+      }, 1000);
     } catch (err: any) {
       console.error('SMS Error:', err);
       setError(err.message || 'Ошибка отправки SMS. Проверьте номер.');
-    } finally {
       setLoading(false);
     }
   };
@@ -72,28 +68,24 @@ export default function ChangePhoneModal({ isOpen, onClose }: ChangePhoneModalPr
     setError('');
 
     try {
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token: otp,
-        type: 'phone_change',
-      });
-
-      if (verifyError) throw verifyError;
-
-      setSuccess('Номер телефона успешно изменен!');
-      setTimeout(() => {
-        onClose();
-        setStep('phone');
-        setPhoneNumber('');
-        setOtp('');
-        setSuccess('');
-      }, 2000);
+      // Mock OTP verification
+      setTimeout(async () => {
+        const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+        await updateProfile({ phone: formattedPhone });
+        
+        setSuccess('Номер телефона успешно изменен!');
+        setTimeout(() => {
+          onClose();
+          setStep('phone');
+          setPhoneNumber('');
+          setOtp('');
+          setSuccess('');
+          setLoading(false);
+        }, 2000);
+      }, 1000);
     } catch (err: any) {
       console.error('OTP Error:', err);
       setError('Неверный код или номер уже используется.');
-    } finally {
       setLoading(false);
     }
   };

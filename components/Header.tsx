@@ -14,8 +14,8 @@ export default function Header() {
       <div className="flex items-center gap-3">
         {user ? (
           <Link href="/profile" className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden border border-primary/20 relative">
-            {userData?.photoURL ? (
-              <Image src={userData.photoURL} alt={userData?.name || 'User'} fill className="object-cover" />
+            {user.photoURL ? (
+              <Image src={user.photoURL} alt={user.displayName || 'User'} fill className="object-cover" />
             ) : (
               <User className="w-6 h-6 text-primary" />
             )}
@@ -35,6 +35,9 @@ export default function Header() {
         <Link href="/create" className={`text-sm font-medium transition-colors ${pathname === '/create' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Создать заявку</Link>
         <Link href="/catalog" className={`text-sm font-medium transition-colors ${pathname === '/catalog' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Каталог</Link>
         <Link href="/chats" className={`text-sm font-medium transition-colors ${pathname === '/chats' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Чаты</Link>
+        {user && userData?.role === 'admin' && (
+          <Link href="/admin" className={`text-sm font-medium transition-colors ${pathname === '/admin' ? 'text-primary font-bold' : 'text-slate-500 hover:text-secondary'}`}>Админ</Link>
+        )}
       </nav>
 
       <div className="flex items-center gap-4">

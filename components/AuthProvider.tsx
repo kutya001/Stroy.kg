@@ -1,17 +1,27 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { getMockUser, createMockUser, updateMockUser } from '@/lib/mockDb';
 import AuthModal from './AuthModal';
 import OnboardingModal from './OnboardingModal';
 
+// Mock User type
+export interface MockUser {
+  uid: string;
+  phone: string;
+  name?: string;
+  role?: string;
+  [key: string]: any;
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: MockUser | null;
   userData: any | null;
   loading: boolean;
   openAuthModal: () => void;
+  loginWithPhone: (phone: string, role?: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (data: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,98 +29,88 @@ const AuthContext = createContext<AuthContextType>({
   userData: null,
   loading: true,
   openAuthModal: () => {},
+  loginWithPhone: async () => {},
   logout: async () => {},
+  updateProfile: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<MockUser | null>(null);
   const [userData, setUserData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchUser = async (sessionUser: User | null) => {
-      setUser(sessionUser);
-      
-      if (sessionUser) {
-        // Fetch or create user document
-        const { data: existingUser, error: fetchError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', sessionUser.id)
-          .single();
-        
-        if (existingUser) {
-          setUserData(existingUser);
-          if (!existingUser.onboardingCompleted) {
-            setIsOnboardingModalOpen(true);
-          }
-        } else {
-          // Create new user profile
-          const isAdmin = sessionUser.email === 'kutmanomuraliev012@gmail.com';
-          const newUserData = {
-            id: sessionUser.id,
-            name: sessionUser.phone || sessionUser.email?.split('@')[0] || 'Пользователь',
-            email: sessionUser.email || '',
-            role: isAdmin ? 'admin' : 'consumer',
-            onboardingCompleted: false,
-          };
-
-          const { data: insertedUser, error: insertError } = await supabase
-            .from('users')
-            .insert([newUserData])
-            .select()
-            .single();
-
-          if (insertedUser) {
-            setUserData(insertedUser);
-            setIsOnboardingModalOpen(true);
-          } else {
-            console.error("Error creating user profile", insertError);
-          }
-        }
-        setIsAuthModalOpen(false);
-      } else {
-        setUserData(null);
+    // Check local storage for mock session
+    const storedUser = localStorage.getItem('mockUser');
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      setUserData(parsedUser);
+      if (!parsedUser.onboardingCompleted) {
+        setIsOnboardingModalOpen(true);
       }
-      setLoading(false);
-    };
-
-    // Initial check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      fetchUser(session?.user || null);
-    });
-
-    // Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      fetchUser(session?.user || null);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    }
+    setLoading(false);
   }, []);
 
   const openAuthModal = () => setIsAuthModalOpen(true);
 
-  const logout = async () => {
+  const loginWithPhone = async (phone: string, role: string = 'consumer', password?: string) => {
+    setLoading(true);
     try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Error signing out', error);
+      let existingUser: any = getMockUser(phone);
+      
+      if (existingUser && existingUser.role === 'admin') {
+        if (existingUser.password !== password) {
+          throw new Error('Неверный пароль администратора');
+        }
+      }
+
+      if (!existingUser) {
+        existingUser = createMockUser(phone, role);
+      }
+      
+      setUser(existingUser);
+      setUserData(existingUser);
+      localStorage.setItem('mockUser', JSON.stringify(existingUser));
+      
+      if (!existingUser.onboardingCompleted) {
+        setIsOnboardingModalOpen(true);
+      }
+      setIsAuthModalOpen(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    setUser(null);
+    setUserData(null);
+    localStorage.removeItem('mockUser');
+  };
+
+  const updateProfile = async (data: any) => {
+    if (user) {
+      const updated = updateMockUser(user.uid, data);
+      if (updated) {
+        setUser(updated);
+        setUserData(updated);
+        localStorage.setItem('mockUser', JSON.stringify(updated));
+      }
     }
   };
 
   const handleOnboardingComplete = (updatedData: any) => {
-    setUserData((prev: any) => ({ ...prev, ...updatedData }));
+    updateProfile({ ...updatedData, onboardingCompleted: true });
     setIsOnboardingModalOpen(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, openAuthModal, logout }}>
+    <AuthContext.Provider value={{ user, userData, loading, openAuthModal, loginWithPhone, logout, updateProfile }}>
       {children}
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       {user && (

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { X, User, Briefcase, Truck, Loader2 } from 'lucide-react';
 
 interface OnboardingModalProps {
@@ -11,7 +10,7 @@ interface OnboardingModalProps {
 }
 
 export default function OnboardingModal({ isOpen, user, onComplete }: OnboardingModalProps) {
-  const [role, setRole] = useState<'consumer' | 'developer' | 'supplier' | null>(null);
+  const [role, setRole] = useState<'consumer' | 'developer' | 'supplier' | null>(user?.role || null);
   const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [inn, setInn] = useState('');
@@ -53,18 +52,14 @@ export default function OnboardingModal({ isOpen, user, onComplete }: Onboarding
         }
       }
 
-      const { error: updateError } = await supabase
-        .from('users')
-        .update(updateData)
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
-
-      onComplete(updateData);
+      // Simulate API call
+      setTimeout(() => {
+        onComplete(updateData);
+        setLoading(false);
+      }, 500);
     } catch (err: any) {
       console.error('Error updating profile:', err);
       setError('Произошла ошибка при сохранении данных. Попробуйте еще раз.');
-    } finally {
       setLoading(false);
     }
   };

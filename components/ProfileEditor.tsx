@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
 import { X, Loader2, Upload, File as FileIcon, Trash2, Camera } from 'lucide-react';
 import Image from 'next/image';
 
@@ -59,29 +58,15 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
     setUploadingPhoto(true);
     
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/avatar_${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      const { error: uploadError, data } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      setPhotoURL(publicUrl);
-
-      // Update users table and auth user metadata
-      await supabase.from('users').update({ photoURL: publicUrl }).eq('id', user.id);
-      await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
-
+      // Mock upload
+      setTimeout(() => {
+        const fakeUrl = URL.createObjectURL(file);
+        setPhotoURL(fakeUrl);
+        setUploadingPhoto(false);
+      }, 1000);
     } catch (err) {
-      console.error('Error uploading photo:', err);
+      console.error('Error initiating photo upload:', err);
       setError('Ошибка при загрузке фото.');
-    } finally {
       setUploadingPhoto(false);
     }
   };
@@ -106,38 +91,30 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
     }
 
     setError('');
-    // Mocking progress for simplicity with Supabase standard upload
-    setUploadProgress(prev => ({ ...prev, [file.name]: 50 }));
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${type}/${Math.random().toString(36).substring(7)}_${file.name}`;
-
-      const { error: uploadError, data } = await supabase.storage
-        .from('user_files')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('user_files')
-        .getPublicUrl(fileName);
-
-      const newFile = { name: file.name, url: publicUrl };
-
-      if (type === 'documents') setDocuments(prev => [...prev, newFile]);
-      if (type === 'projects') setProjects(prev => [...prev, newFile]);
-      if (type === 'certificates') setCertificates(prev => [...prev, newFile]);
-    } catch (err) {
-      console.error('Error uploading file:', err);
-      setError('Ошибка при загрузке файла.');
-    } finally {
-      setUploadProgress(prev => {
-        const newProg = { ...prev };
-        delete newProg[file.name];
-        return newProg;
-      });
-    }
+    setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+    
+    // Mock upload
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 20;
+      setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
+      
+      if (progress >= 100) {
+        clearInterval(interval);
+        const fakeUrl = URL.createObjectURL(file);
+        const newFile = { name: file.name, url: fakeUrl };
+        
+        if (type === 'documents') setDocuments(prev => [...prev, newFile]);
+        if (type === 'projects') setProjects(prev => [...prev, newFile]);
+        if (type === 'certificates') setCertificates(prev => [...prev, newFile]);
+        
+        setUploadProgress(prev => {
+          const newProg = { ...prev };
+          delete newProg[file.name];
+          return newProg;
+        });
+      }
+    }, 200);
   };
 
   const removeFile = (type: 'documents' | 'projects' | 'certificates', index: number) => {
@@ -160,7 +137,7 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
     setError('');
 
     try {
-      const updateData: any = { name, region };
+      const updateData: any = { name, region, photoURL };
 
       if (role === 'consumer') {
         updateData.dateOfBirth = dateOfBirth;
@@ -179,23 +156,19 @@ export default function ProfileEditor({ user, userData, onClose, onSave }: Profi
         updateData.categories = categories;
       }
 
-      // Clean up undefined/empty values to avoid issues
+      // Clean up undefined/empty values
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === undefined) delete updateData[key];
       });
 
-      const { error: updateError } = await supabase
-        .from('users')
-        .update(updateData)
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
-
-      onSave(updateData);
+      // Simulate API call
+      setTimeout(() => {
+        onSave(updateData);
+        setLoading(false);
+      }, 500);
     } catch (err: any) {
       console.error('Error updating profile:', err);
       setError('Произошла ошибка при сохранении данных.');
-    } finally {
       setLoading(false);
     }
   };

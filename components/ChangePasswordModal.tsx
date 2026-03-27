@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Lock, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useState } from 'react';
+import { X, Lock, Loader2, AlertCircle } from 'lucide-react';
+
+import { useAuth } from './AuthProvider';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -10,6 +11,8 @@ interface ChangePasswordModalProps {
 }
 
 export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProps) {
+  const { user, userData, updateProfile } = useAuth();
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,106 +23,133 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setSuccess(false);
+
     if (newPassword !== confirmPassword) {
-      setError('Пароли не совпадают');
+      setError('Новые пароли не совпадают');
       return;
     }
+
     if (newPassword.length < 6) {
       setError('Пароль должен содержать минимум 6 символов');
       return;
     }
 
     setLoading(true);
-    setError('');
-    setSuccess(false);
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword
-      });
+      if (userData?.password && userData.password !== currentPassword) {
+        setError('Неверный текущий пароль');
+        setLoading(false);
+        return;
+      }
 
-      if (updateError) throw updateError;
-
+      // Mock password change
+      await updateProfile({ password: newPassword });
+      
       setSuccess(true);
       setTimeout(() => {
         onClose();
+        setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setSuccess(false);
+        setLoading(false);
       }, 2000);
     } catch (err: any) {
-      console.error('Password change error:', err);
+      console.error('Error changing password:', err);
       setError(err.message || 'Произошла ошибка при смене пароля');
-    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden relative animate-in fade-in zoom-in-95 duration-200">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}></div>
+      
+      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <h2 className="text-2xl font-heading font-bold text-secondary">Смена пароля</h2>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-        <div className="p-8">
-          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center mb-6">
-            <Lock className="w-6 h-6 text-primary" />
-          </div>
-
-          <h2 className="text-2xl font-heading font-bold text-secondary mb-2">
-            Смена пароля
-          </h2>
-          <p className="text-slate-500 text-sm mb-8">
-            Введите новый пароль для вашего аккаунта
-          </p>
-
-          {error && (
-            <div className="mb-6 p-3 bg-danger/10 border border-danger/20 rounded-xl text-danger text-sm">
-              {error}
+        <div className="p-6 overflow-y-auto">
+          {success ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-secondary mb-2">Пароль успешно изменен</h3>
+              <p className="text-slate-500">Вы можете использовать новый пароль для входа.</p>
             </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Текущий пароль</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    placeholder="Введите текущий пароль"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Новый пароль</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    placeholder="Минимум 6 символов"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Подтвердите новый пароль</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    placeholder="Повторите новый пароль"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition-colors flex items-center justify-center gap-2 mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Сохранить пароль'}
+              </button>
+            </form>
           )}
-
-          {success && (
-            <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-xl text-green-600 text-sm font-medium">
-              Пароль успешно изменен!
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-secondary mb-2">Новый пароль</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-secondary mb-2">Подтвердите пароль</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !newPassword || !confirmPassword || success}
-              className="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 hover:bg-primary-dark active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Сохранить пароль'}
-            </button>
-          </form>
         </div>
       </div>
     </div>

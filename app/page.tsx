@@ -1,92 +1,17 @@
-'use client';
-
 import Image from 'next/image';
-import { MapPin, ArrowRight, CheckCircle2, Plus, Search, Layers, Wallet, MessageSquare } from 'lucide-react';
+import { MapPin, ArrowRight, CheckCircle2, Send, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/components/AuthProvider';
+import { getAllMockRequests } from '@/lib/mockDb';
 
 export default function FeedPage() {
-  const { user, userData } = useAuth();
-  const [requests, setRequests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchRequests = async () => {
-      const { data, error } = await supabase
-        .from('requests')
-        .select(`
-          *,
-          author:users!authorId(name, companyName, role, verificationStatus)
-        `)
-        .eq('isActive', true)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setRequests(data);
-      }
-      setLoading(false);
-    };
-
-    fetchRequests();
-  }, []);
-
-  const handleResponse = async (requestId: string, consumerId: string) => {
-    if (!user) {
-      alert('Пожалуйста, войдите в аккаунт');
-      return;
-    }
-    if (userData?.verificationStatus !== 'verified') {
-      alert('Только подтвержденные поставщики могут откликаться на заявки.');
-      return;
-    }
-
-    try {
-      // Create or find chat
-      const { data: existingChat } = await supabase
-        .from('chats')
-        .select('id')
-        .eq('requestId', requestId)
-        .eq('consumerId', consumerId)
-        .eq('supplierId', user.id)
-        .single();
-
-      if (existingChat) {
-        window.location.href = `/chats/${existingChat.id}`;
-        return;
-      }
-
-      const { data: newChat, error } = await supabase
-        .from('chats')
-        .insert([{ requestId, consumerId, supplierId: user.id }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Send initial message
-      await supabase.from('messages').insert([{
-        chatId: newChat.id,
-        senderId: user.id,
-        content: `Здравствуйте! Я готов выполнить вашу заявку.`
-      }]);
-
-      window.location.href = `/chats/${newChat.id}`;
-    } catch (err) {
-      console.error('Error responding to request:', err);
-      alert('Ошибка при отклике на заявку');
-    }
-  };
+  const requests = getAllMockRequests();
 
   return (
     <main className="max-w-5xl mx-auto px-4 pb-24 pt-6">
       {/* Welcome Section */}
       <section className="mb-8">
-        <h1 className="text-2xl font-heading font-bold text-secondary mb-1">
-          Добро пожаловать{userData?.name ? `, ${userData.name}` : ''}! 👋
-        </h1>
-        <p className="text-slate-500 text-sm mb-6">{userData?.region || 'Кыргызстан'}</p>
+        <h1 className="text-2xl font-heading font-bold text-secondary mb-1">Добро пожаловать! 👋</h1>
+        <p className="text-slate-500 text-sm mb-6">Бишкек · Весна 2026</p>
         
         <div className="relative mb-6">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -123,58 +48,75 @@ export default function FeedPage() {
         </div>
       </section>
 
-      {/* Feed Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          <div className="col-span-full py-12 text-center text-slate-500">Загрузка заявок...</div>
-        ) : requests.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-slate-500 bg-slate-50 rounded-3xl border border-slate-200">
-            Нет активных заявок.
-          </div>
-        ) : (
-          requests.map(req => (
-            <div key={req.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col relative overflow-hidden group hover:border-primary/30 hover:shadow-md transition-all">
-              <div className="flex items-start justify-between mb-4">
-                <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold tracking-wider uppercase rounded-full">
-                  {req.category}
-                </span>
-                <span className="text-xs text-slate-400 font-medium">
-                  {new Date(req.created_at).toLocaleDateString('ru-RU')}
-                </span>
-              </div>
-
-              <h3 className="text-lg font-bold text-secondary mb-2 line-clamp-2">{req.title}</h3>
-              <p className="text-slate-500 text-sm line-clamp-3 mb-4 flex-1">{req.description}</p>
-
-              <div className="space-y-2 mb-6">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                  <MapPin className="w-4 h-4 text-slate-400" /> {req.region}
-                </div>
-                {req.budget && (
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                    <Wallet className="w-4 h-4 text-slate-400" /> {req.budget.toLocaleString()} сом
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                  <span className="font-bold">{req.author?.companyName || req.author?.name || 'Пользователь'}</span>
-                </div>
-              </div>
-
-              {user?.id !== req.authorId && (userData?.role === 'supplier' || userData?.role === 'developer') ? (
-                <button
-                  onClick={() => handleResponse(req.id, req.authorId)}
-                  className="w-full py-3 bg-primary text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-primary-dark active:scale-95 transition-all"
-                >
-                  <MessageSquare className="w-4 h-4" /> Откликнуться
-                </button>
-              ) : (
-                <div className="w-full py-3 bg-slate-50 text-slate-500 font-medium rounded-xl flex items-center justify-center text-sm border border-slate-100">
-                  {user?.id === req.authorId ? 'Ваша заявка' : 'Только для поставщиков'}
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Requests List */}
+        <div className="md:col-span-8 flex flex-col gap-6">
+          {requests.map((req, idx) => (
+            <div key={req.id} className="group cursor-pointer relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-md transition-shadow border border-slate-100">
+              {idx === 0 && (
+                <div className="aspect-[16/9] w-full bg-slate-100 overflow-hidden relative">
+                  <Image src="https://picsum.photos/seed/construction/800/450" alt="Construction site" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
               )}
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${req.category === 'Материалы' ? 'bg-secondary text-white' : 'bg-primary/10 text-primary'}`}>
+                    {req.category}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {new Date(req.createdAt).toLocaleDateString('ru-RU', { hour: '2-digit', minute: '2-digit' })} • {req.authorName}
+                  </span>
+                </div>
+                <h3 className="text-xl font-heading font-semibold leading-tight mb-2 text-secondary">{req.title}</h3>
+                <p className="text-slate-600 mb-4 text-sm">{req.description}</p>
+                
+                <div className="flex items-center gap-4 mb-4 text-sm font-medium text-slate-700">
+                  <span className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                    Объем: {req.quantity} {req.unit}
+                  </span>
+                  <span className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                    Бюджет: {req.budget.toLocaleString()} KGS
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-50">
+                  <div className="flex items-center gap-1 text-slate-500">
+                    <MapPin className="w-4 h-4" />
+                    <span className="text-xs font-medium">{req.region}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-medium text-slate-400">{req.responsesCount} откликов</span>
+                    <button className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
+                      Подробнее <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          ))
-        )}
+          ))}
+        </div>
+
+        {/* Supplier Highlight */}
+        <div className="md:col-span-4 rounded-2xl bg-secondary text-white p-6 flex flex-col justify-between shadow-sm relative overflow-hidden h-fit sticky top-20">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="px-3 py-1 rounded-full bg-accent text-secondary text-[10px] font-bold tracking-wider uppercase">Предложение</span>
+            </div>
+            <h3 className="text-xl font-heading font-bold mb-3">Арматурная сталь со склада в Бишкеке</h3>
+            <p className="text-sm opacity-90 mb-6 italic">&quot;Для покупателей: лучшие условия на объем от 50 тонн&quot;</p>
+            <ul className="space-y-3 mb-8">
+              <li className="flex items-center gap-2 text-sm font-medium">
+                <CheckCircle2 className="w-4 h-4 text-accent" /> А500С все диаметры
+              </li>
+              <li className="flex items-center gap-2 text-sm font-medium">
+                <CheckCircle2 className="w-4 h-4 text-accent" /> Доставка за 24 часа
+              </li>
+            </ul>
+          </div>
+          <button className="w-full py-3 rounded-full bg-primary text-white font-bold text-sm z-10 hover:bg-primary-dark transition-colors">Запросить прайс</button>
+          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+        </div>
       </div>
 
       {/* FAB */}
