@@ -184,11 +184,80 @@ export const mockRequests = [
   }
 ];
 
+export const mockNotifications = [
+  { id: 'notif-1', userId: 'supplier-123', text: 'Новая заявка на бетон в вашем регионе!', date: new Date().toISOString(), read: false, type: 'request' },
+  { id: 'notif-2', userId: 'consumer-123', text: 'Поставщик ОсОО СтройМастер откликнулся на вашу заявку.', date: new Date().toISOString(), read: true, type: 'response' },
+  { id: 'notif-3', userId: 'consumer-123', text: 'Ваша заявка "Арматура А500С 12мм" успешно опубликована.', date: new Date(Date.now() - 86400000).toISOString(), read: true, type: 'system' },
+];
+
+export const mockChats = [
+  { 
+    id: 'chat-1', 
+    participants: ['consumer-123', 'supplier-123'], 
+    lastMessage: 'Здравствуйте, готов поставить бетон. Какая марка нужна?', 
+    updatedAt: new Date().toISOString(), 
+    unreadCount: 1, 
+    otherUser: { name: 'ОсОО СтройМастер', role: 'supplier', avatar: 'https://picsum.photos/seed/supplier1/100/100' } 
+  },
+  { 
+    id: 'chat-2', 
+    participants: ['consumer-123', 'supplier-124'], 
+    lastMessage: 'Да, доставка включена в стоимость.', 
+    updatedAt: new Date(Date.now() - 3600000).toISOString(), 
+    unreadCount: 0, 
+    otherUser: { name: 'СеверЛес Экспорт', role: 'supplier', avatar: 'https://picsum.photos/seed/supplier2/100/100' } 
+  },
+  { 
+    id: 'chat-3', 
+    participants: ['supplier-123', 'consumer-124'], 
+    lastMessage: 'Спасибо, ждем счет на оплату.', 
+    updatedAt: new Date(Date.now() - 86400000).toISOString(), 
+    unreadCount: 0, 
+    otherUser: { name: 'ИП Смаилов', role: 'consumer', avatar: 'https://picsum.photos/seed/consumer1/100/100' } 
+  }
+];
+
 let products = [...mockProducts];
 let requests = [...mockRequests];
+let notifications = [...mockNotifications];
+let chats = [...mockChats];
 
 export const getAllMockProducts = () => [...products];
 export const getAllMockRequests = () => [...requests];
+
+export const createMockProduct = (data: any) => {
+  const newProd = {
+    id: `prod-${Date.now()}`,
+    rating: 0,
+    tags: [],
+    isTop: false,
+    isNew: true,
+    ...data
+  };
+  products.unshift(newProd);
+  return newProd;
+};
+
+export const getMockNotifications = (userId: string) => {
+  return notifications.filter(n => n.userId === userId);
+};
+
+export const markNotificationAsRead = (id: string) => {
+  const notif = notifications.find(n => n.id === id);
+  if (notif) notif.read = true;
+};
+
+export const getMockChats = (userId: string) => {
+  return chats.filter(c => c.participants.includes(userId)).map(chat => {
+    // Determine the other user's info based on who is asking
+    const otherParticipantId = chat.participants.find(p => p !== userId);
+    const otherUserDb = users.find(u => u.uid === otherParticipantId);
+    return {
+      ...chat,
+      otherUser: otherUserDb ? { name: otherUserDb.name, role: otherUserDb.role, avatar: `https://picsum.photos/seed/${otherUserDb.uid}/100/100` } : chat.otherUser
+    };
+  }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+};
 
 export const createMockRequest = (data: any) => {
   const newReq = {

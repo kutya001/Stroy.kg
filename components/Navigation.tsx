@@ -1,15 +1,23 @@
 'use client';
-import { Home, PlusCircle, Store, MessageSquare, User } from 'lucide-react';
+import { Home, PlusCircle, Store, MessageSquare, User, PackagePlus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function Navigation() {
   const pathname = usePathname();
+  const { userData } = useAuth();
+
+  const isSupplier = userData?.role === 'supplier';
 
   const navItems = [
     { href: '/', icon: Home, label: 'Главная' },
     { href: '/catalog', icon: Store, label: 'Каталог' },
-    { href: '/create', icon: PlusCircle, label: 'Заявки' },
+    { 
+      href: isSupplier ? '/add-product' : '/create', 
+      icon: isSupplier ? PackagePlus : PlusCircle, 
+      label: isSupplier ? 'Добавить' : 'Заявки' 
+    },
     { href: '/chats', icon: MessageSquare, label: 'Чат' },
     { href: '/profile', icon: User, label: 'Профиль' },
   ];

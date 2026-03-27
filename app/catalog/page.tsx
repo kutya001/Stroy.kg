@@ -1,9 +1,15 @@
-import { Search, MapPin, Grid, SlidersHorizontal, Star, BadgeCheck, MessageSquare } from 'lucide-react';
+'use client';
+
+import { Search, MapPin, Grid, SlidersHorizontal, Star, BadgeCheck, MessageSquare, Plus } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { getAllMockProducts } from '@/lib/mockDb';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function CatalogPage() {
   const products = getAllMockProducts();
+  const { userData } = useAuth();
+  const isSupplier = userData?.role === 'supplier';
 
   return (
     <main className="max-w-7xl mx-auto px-4 md:px-6 pt-6 pb-24">
@@ -35,6 +41,11 @@ export default function CatalogPage() {
           <button className="flex items-center gap-2 h-14 px-6 bg-primary/10 text-primary font-medium rounded-2xl hover:bg-primary/20 transition-colors whitespace-nowrap border border-primary/20">
             <SlidersHorizontal className="w-5 h-5" /> Фильтры
           </button>
+          {isSupplier && (
+            <Link href="/add-product" className="flex items-center gap-2 h-14 px-6 bg-primary text-white font-bold rounded-2xl hover:bg-primary-dark transition-colors whitespace-nowrap shadow-sm shadow-primary/20">
+              <Plus className="w-5 h-5" /> Добавить товар
+            </Link>
+          )}
         </div>
       </div>
 

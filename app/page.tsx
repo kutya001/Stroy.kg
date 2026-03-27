@@ -1,40 +1,64 @@
+'use client';
+
 import Image from 'next/image';
-import { MapPin, ArrowRight, CheckCircle2, Send, Plus, Search } from 'lucide-react';
+import { MapPin, ArrowRight, CheckCircle2, Plus, Search, PackagePlus, Store } from 'lucide-react';
 import Link from 'next/link';
 import { getAllMockRequests } from '@/lib/mockDb';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function FeedPage() {
   const requests = getAllMockRequests();
+  const { userData } = useAuth();
+  const isSupplier = userData?.role === 'supplier';
 
   return (
     <main className="max-w-5xl mx-auto px-4 pb-24 pt-6">
       {/* Welcome Section */}
       <section className="mb-8">
-        <h1 className="text-2xl font-heading font-bold text-secondary mb-1">Добро пожаловать! 👋</h1>
+        <h1 className="text-2xl font-heading font-bold text-secondary mb-1">
+          {isSupplier ? 'Добро пожаловать, Поставщик! 👋' : 'Добро пожаловать! 👋'}
+        </h1>
         <p className="text-slate-500 text-sm mb-6">Бишкек · Весна 2026</p>
         
         <div className="relative mb-6">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-          <input type="text" placeholder="Найти материал или услугу" className="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 shadow-sm outline-none" />
+          <input type="text" placeholder={isSupplier ? "Найти заявки на материалы или услуги" : "Найти материал или услугу"} className="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 shadow-sm outline-none" />
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <Link href="/catalog?type=materials" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
-            <span className="text-3xl">🧱</span>
-            <span className="font-heading font-semibold text-sm text-secondary text-center">Купить<br/>материалы</span>
-          </Link>
-          <Link href="/catalog?type=services" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
-            <span className="text-3xl">🔨</span>
-            <span className="font-heading font-semibold text-sm text-secondary text-center">Нанять<br/>строителей</span>
-          </Link>
+          {isSupplier ? (
+            <>
+              <Link href="/add-product" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
+                <PackagePlus className="w-8 h-8 text-primary" />
+                <span className="font-heading font-semibold text-sm text-secondary text-center">Добавить<br/>товар</span>
+              </Link>
+              <Link href="/catalog" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
+                <Store className="w-8 h-8 text-primary" />
+                <span className="font-heading font-semibold text-sm text-secondary text-center">Мои<br/>товары</span>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/catalog?type=materials" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
+                <span className="text-3xl">🧱</span>
+                <span className="font-heading font-semibold text-sm text-secondary text-center">Купить<br/>материалы</span>
+              </Link>
+              <Link href="/catalog?type=services" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
+                <span className="text-3xl">🔨</span>
+                <span className="font-heading font-semibold text-sm text-secondary text-center">Нанять<br/>строителей</span>
+              </Link>
+            </>
+          )}
         </div>
 
-        <div className="bg-primary/10 rounded-2xl p-4 flex items-center justify-between border border-primary/20">
-          <p className="text-sm text-secondary font-medium">Пусть поставщики сами вас найдут</p>
-          <Link href="/create" className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary-dark transition-colors whitespace-nowrap">
-            + Создать заявку
-          </Link>
-        </div>
+        {!isSupplier && (
+          <div className="bg-primary/10 rounded-2xl p-4 flex items-center justify-between border border-primary/20">
+            <p className="text-sm text-secondary font-medium">Пусть поставщики сами вас найдут</p>
+            <Link href="/create" className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary-dark transition-colors whitespace-nowrap">
+              + Создать заявку
+            </Link>
+          </div>
+        )}
       </section>
 
       {/* Filters */}
@@ -88,7 +112,7 @@ export default function FeedPage() {
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-medium text-slate-400">{req.responsesCount} откликов</span>
                     <button className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
-                      Подробнее <ArrowRight className="w-4 h-4" />
+                      {isSupplier ? 'Откликнуться' : 'Подробнее'} <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -120,8 +144,8 @@ export default function FeedPage() {
       </div>
 
       {/* FAB */}
-      <Link href="/create" className="fixed bottom-20 md:bottom-8 right-4 md:right-8 w-14 h-14 bg-primary text-white rounded-full shadow-lg shadow-primary/30 flex items-center justify-center z-40 hover:scale-105 active:scale-95 transition-all">
-        <Plus className="w-6 h-6" />
+      <Link href={isSupplier ? "/add-product" : "/create"} className="fixed bottom-20 md:bottom-8 right-4 md:right-8 w-14 h-14 bg-primary text-white rounded-full shadow-lg shadow-primary/30 flex items-center justify-center z-40 hover:scale-105 active:scale-95 transition-all">
+        {isSupplier ? <PackagePlus className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
       </Link>
     </main>
   );
