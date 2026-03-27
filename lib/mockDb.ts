@@ -206,6 +206,10 @@ export const getMockUser = (phone: string) => {
   return users.find(u => u.phone === phone) || null;
 };
 
+export const getMockUserById = (uid: string) => {
+  return users.find(u => u.uid === uid) || null;
+};
+
 export const getMockUserByEmail = (email: string) => {
   return users.find(u => u.email === email) || null;
 };
@@ -443,6 +447,10 @@ export interface MockRequest {
   title: string;
   category: NomenclatureCategory;
   type?: NomenclatureType;
+  groupId?: string;
+  groupName?: string;
+  characteristics?: Record<string, string>;
+  linkedProductId?: string;
   description: string;
   budget: number;
   quantity: number;
@@ -736,6 +744,10 @@ export const deleteMockProduct = (id: string) => {
 // ==========================================
 
 export const getAllMockRequests = () => [...requests];
+
+export const getRequestById = (id: string): MockRequest | null => {
+  return requests.find(r => r.id === id) || null;
+};
 
 export const createMockRequest = (data: Partial<MockRequest>): MockRequest => {
   const newReq: MockRequest = {

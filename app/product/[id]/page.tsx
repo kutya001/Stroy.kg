@@ -146,8 +146,8 @@ export default function ProductDetailPage() {
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              <Link href="/create" className="w-full bg-primary text-white h-12 rounded-xl text-sm font-bold hover:bg-primary-dark active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                <ShoppingCart className="w-5 h-5" /> Отправить запрос
+              <Link href={`/create?productId=${product.id}`} className="w-full bg-primary text-white h-12 rounded-xl text-sm font-bold hover:bg-primary-dark active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                <ShoppingCart className="w-5 h-5" /> Оставить заявку на этот товар
               </Link>
               <button
                 onClick={handleChatClick}
@@ -162,7 +162,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Supplier Card */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <Link href={`/supplier/${product.supplierId}`} className="block bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all group">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
                 {product.supplierName.charAt(0)}
@@ -188,7 +188,8 @@ export default function ProductDetailPage() {
                 <div className="text-[10px] text-slate-500 uppercase font-bold">Рейтинг</div>
               </div>
             </div>
-          </div>
+            <p className="text-xs text-primary font-medium mt-3 text-center group-hover:underline">Открыть страницу поставщика →</p>
+          </Link>
         </div>
       </div>
 

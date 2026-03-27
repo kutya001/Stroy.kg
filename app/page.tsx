@@ -1,11 +1,18 @@
 'use client';
 
 import Image from 'next/image';
-import { MapPin, ArrowRight, CheckCircle2, Plus, Search, PackagePlus, Store, Package, Wrench, BarChart3, Shield, Star, BadgeCheck, Megaphone, ShoppingCart, Tag } from 'lucide-react';
+import { MapPin, ArrowRight, CheckCircle2, Plus, Search, PackagePlus, Store, Package, Wrench, BarChart3, Shield, Star, BadgeCheck, Megaphone, ShoppingCart, Tag, Newspaper, TrendingUp, Users, FileText, Sparkles, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { getAllMockRequests, getAllMockProducts, getVerificationLabel, getVerificationColor, type NomenclatureCategory } from '@/lib/mockDb';
 import { useAuth } from '@/components/AuthProvider';
 import { useEffect, useState, useMemo } from 'react';
+
+// Mock news data
+const mockNews = [
+  { id: 'n1', title: 'Новые стандарты строительства в КР вступают в силу', summary: 'С 1 июля 2026 года начинают действовать новые строительные нормы и правила.', date: '2026-05-15', tag: 'Законодательство', image: 'https://picsum.photos/seed/news1/400/250' },
+  { id: 'n2', title: 'Цены на цемент стабилизировались', summary: 'После весеннего скачка цены на основные марки цемента вернулись к среднегодовым значениям.', date: '2026-05-12', tag: 'Рынок', image: 'https://picsum.photos/seed/news2/400/250' },
+  { id: 'n3', title: 'Stroy.kg запускает программу верификации PRO', summary: 'Верифицированные поставщики получат расширенный доступ к инструментам продвижения.', date: '2026-05-10', tag: 'Платформа', image: 'https://picsum.photos/seed/news3/400/250' },
+];
 
 export default function FeedPage() {
   const requests = getAllMockRequests();
@@ -29,6 +36,9 @@ export default function FeedPage() {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [allProducts, feedFilter]);
+
+  // Top recommended (promoted products)
+  const recommended = useMemo(() => allProducts.filter(p => p.isPromoted || p.isTop).slice(0, 4), [allProducts]);
 
   // Supplier feed: requests filtered
   const filteredRequests = useMemo(() => {
@@ -62,37 +72,36 @@ export default function FeedPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input type="text" placeholder={isSupplier ? "Найти заявки на материалы или услуги" : "Найти материал или услугу"} className="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 shadow-sm outline-none" />
         </div>
+      </section>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {isSupplier ? (
-            <>
-              <Link href="/dashboard" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
-                <BarChart3 className="w-8 h-8 text-primary" />
-                <span className="font-heading font-semibold text-sm text-secondary text-center">Дашборд</span>
-              </Link>
-              <Link href="/add-product" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
-                <PackagePlus className="w-8 h-8 text-primary" />
-                <span className="font-heading font-semibold text-sm text-secondary text-center">Добавить<br/>товар</span>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/catalog?category=Товар" className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 hover:shadow-md transition-all">
-                <Package className="w-10 h-10 text-primary" />
-                <span className="font-heading font-semibold text-sm text-secondary text-center">Купить Товар</span>
-                <span className="text-[10px] text-slate-400">Материалы, Инструменты, Оборудование</span>
-              </Link>
-              <Link href="/catalog?category=Услуга" className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 hover:shadow-md transition-all">
-                <Wrench className="w-10 h-10 text-primary" />
-                <span className="font-heading font-semibold text-sm text-secondary text-center">Купить Услугу</span>
-                <span className="text-[10px] text-slate-400">Строители, Аренда, Проектирование</span>
-              </Link>
-            </>
-          )}
-        </div>
+      {/* ===== BUYER NAVIGATION BUTTONS ===== */}
+      {!isSupplier && (
+        <section className="mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Link href="/catalog" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 hover:shadow-md transition-all group">
+              <Package className="w-9 h-9 text-primary group-hover:scale-110 transition-transform" />
+              <span className="font-heading font-semibold text-sm text-secondary text-center">Каталог</span>
+              <span className="text-[10px] text-slate-400">Товары и услуги</span>
+            </Link>
+            <Link href="/create" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 hover:shadow-md transition-all group">
+              <FileText className="w-9 h-9 text-primary group-hover:scale-110 transition-transform" />
+              <span className="font-heading font-semibold text-sm text-secondary text-center">Заявка</span>
+              <span className="text-[10px] text-slate-400">Создать запрос</span>
+            </Link>
+            <Link href="/catalog?mode=suppliers" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 hover:shadow-md transition-all group">
+              <Users className="w-9 h-9 text-primary group-hover:scale-110 transition-transform" />
+              <span className="font-heading font-semibold text-sm text-secondary text-center">Поставщики</span>
+              <span className="text-[10px] text-slate-400">Найти продавца</span>
+            </Link>
+            <Link href="/chats" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 hover:shadow-md transition-all group">
+              <Store className="w-9 h-9 text-primary group-hover:scale-110 transition-transform" />
+              <span className="font-heading font-semibold text-sm text-secondary text-center">Переговоры</span>
+              <span className="text-[10px] text-slate-400">Чат с продавцами</span>
+            </Link>
+          </div>
 
-        {!isSupplier && (
-          <div className="bg-primary/10 rounded-2xl p-4 flex items-center justify-between border border-primary/20">
+          {/* Create request banner */}
+          <div className="mt-4 bg-primary/10 rounded-2xl p-4 flex items-center justify-between border border-primary/20">
             <p className="text-sm text-secondary font-medium">Пусть поставщики сами вас найдут</p>
             {canAccessRequests ? (
               <Link href="/create" className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary-dark transition-colors whitespace-nowrap">
@@ -104,8 +113,88 @@ export default function FeedPage() {
               </Link>
             )}
           </div>
-        )}
+        </section>
+      )}
+
+      {/* ===== SUPPLIER NAVIGATION ===== */}
+      {isSupplier && (
+        <section className="mb-8">
+          <div className="grid grid-cols-2 gap-4">
+            <Link href="/catalog" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
+              <Store className="w-8 h-8 text-primary" />
+              <span className="font-heading font-semibold text-sm text-secondary text-center">Мой каталог</span>
+            </Link>
+            <Link href="/add-product" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-primary/30 transition-colors">
+              <PackagePlus className="w-8 h-8 text-primary" />
+              <span className="font-heading font-semibold text-sm text-secondary text-center">Добавить товар</span>
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* ===== NEWS SECTION ===== */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-heading font-bold text-lg text-secondary flex items-center gap-2">
+            <Newspaper className="w-5 h-5 text-primary" /> Новости
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {mockNews.map(news => (
+            <div key={news.id} className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+              <div className="relative h-36 overflow-hidden">
+                <Image src={news.image} alt={news.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                <span className="absolute top-2 left-2 px-2 py-0.5 bg-secondary text-white text-[10px] font-bold rounded">{news.tag}</span>
+              </div>
+              <div className="p-4">
+                <h3 className="font-heading font-bold text-sm text-secondary mb-1 line-clamp-2">{news.title}</h3>
+                <p className="text-xs text-slate-500 line-clamp-2 mb-2">{news.summary}</p>
+                <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                  <Clock className="w-3 h-3" /> {mounted ? new Date(news.date).toLocaleDateString('ru-RU') : ''}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
+
+      {/* ===== RECOMMENDATIONS (Buyer) ===== */}
+      {!isSupplier && recommended.length > 0 && (
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading font-bold text-lg text-secondary flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-accent" /> Рекомендации
+            </h2>
+            <Link href="/catalog" className="text-sm text-primary font-medium flex items-center gap-1 hover:underline">
+              Все товары <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {recommended.map(product => (
+              <Link key={product.id} href={`/product/${product.id}`} className="group bg-white rounded-2xl overflow-hidden hover:shadow-lg transition-all border border-slate-100">
+                <div className="relative h-32 overflow-hidden">
+                  <Image src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <div className="absolute top-2 left-2">
+                    {product.isPromoted && (
+                      <span className="px-2 py-0.5 bg-accent text-secondary text-[9px] font-bold rounded flex items-center gap-1">
+                        <Megaphone className="w-3 h-3" /> REC
+                      </span>
+                    )}
+                  </div>
+                  <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <Star className="w-3 h-3 text-accent fill-accent" />
+                    <span className="text-[10px] font-bold">{product.rating}</span>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <h4 className="font-medium text-xs text-secondary truncate">{product.name}</h4>
+                  <p className="text-sm font-bold text-primary mt-1">{product.price.toLocaleString()} KGS</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Feed Filters */}
       <section className="mb-6">
@@ -121,73 +210,45 @@ export default function FeedPage() {
 
       {/* BUYER FEED: Products */}
       {!isSupplier && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          <div className="md:col-span-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {filteredProducts.map((product) => (
-                <Link key={product.id} href={`/product/${product.id}`} className="group bg-white rounded-2xl overflow-hidden hover:shadow-lg transition-all border border-slate-100">
-                  <div className="relative h-40 overflow-hidden">
-                    <Image src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                    <div className="absolute top-2 left-2 flex flex-col gap-1">
-                      {product.isPromoted && (
-                        <span className="px-2 py-0.5 bg-accent text-secondary text-[10px] font-bold rounded flex items-center gap-1">
-                          <Megaphone className="w-3 h-3" /> РЕКОМЕНДУЕМ
-                        </span>
-                      )}
-                      {product.isNew && (
-                        <span className="px-2 py-0.5 bg-primary text-white text-[10px] font-bold rounded">НОВИНКА</span>
-                      )}
-                    </div>
-                    <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <Star className="w-3 h-3 text-accent fill-accent" />
-                      <span className="text-xs font-bold">{product.rating}</span>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <div className="flex items-center gap-1 mb-1">
-                      <h4 className="font-heading text-sm font-bold text-secondary truncate">{product.supplierName}</h4>
-                      <BadgeCheck className="w-4 h-4 text-success shrink-0" />
-                    </div>
-                    <p className="text-[10px] text-slate-400 mb-1">
-                      <MapPin className="w-3 h-3 inline" /> {product.region} · {product.groupName}
-                    </p>
-                    <h5 className="font-medium text-slate-800 text-sm mb-1">{product.name}</h5>
-                    <p className="text-lg font-bold text-primary">{product.price.toLocaleString()} KGS / {product.unit}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-            {filteredProducts.length === 0 && (
-              <div className="text-center py-12">
-                <Tag className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 text-sm">Нет товаров по выбранному фильтру</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+          {filteredProducts.map((product) => (
+            <Link key={product.id} href={`/product/${product.id}`} className="group bg-white rounded-2xl overflow-hidden hover:shadow-lg transition-all border border-slate-100">
+              <div className="relative h-40 overflow-hidden">
+                <Image src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute top-2 left-2 flex flex-col gap-1">
+                  {product.isPromoted && (
+                    <span className="px-2 py-0.5 bg-accent text-secondary text-[10px] font-bold rounded flex items-center gap-1">
+                      <Megaphone className="w-3 h-3" /> РЕКОМЕНДУЕМ
+                    </span>
+                  )}
+                  {product.isNew && (
+                    <span className="px-2 py-0.5 bg-primary text-white text-[10px] font-bold rounded">НОВИНКА</span>
+                  )}
+                </div>
+                <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <Star className="w-3 h-3 text-accent fill-accent" />
+                  <span className="text-xs font-bold">{product.rating}</span>
+                </div>
               </div>
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <div className="md:col-span-4 rounded-2xl bg-secondary text-white p-6 flex flex-col justify-between shadow-sm relative overflow-hidden h-fit sticky top-20">
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="px-3 py-1 rounded-full bg-accent text-secondary text-[10px] font-bold tracking-wider uppercase">Рекомендуемый</span>
+              <div className="p-4">
+                <div className="flex items-center gap-1 mb-1">
+                  <h4 className="font-heading text-sm font-bold text-secondary truncate">{product.supplierName}</h4>
+                  <BadgeCheck className="w-4 h-4 text-success shrink-0" />
+                </div>
+                <p className="text-[10px] text-slate-400 mb-1">
+                  <MapPin className="w-3 h-3 inline" /> {product.region} · {product.groupName}
+                </p>
+                <h5 className="font-medium text-slate-800 text-sm mb-1">{product.name}</h5>
+                <p className="text-lg font-bold text-primary">{product.price.toLocaleString()} KGS / {product.unit}</p>
               </div>
-              <h3 className="text-xl font-heading font-bold mb-3">Арматурная сталь со склада в Бишкеке</h3>
-              <p className="text-sm opacity-90 mb-6 italic">&quot;Лучшие условия на объем от 50 тонн&quot;</p>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center gap-2 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4 text-accent" /> А500С все диаметры
-                </li>
-                <li className="flex items-center gap-2 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4 text-accent" /> Доставка за 24 часа
-                </li>
-                <li className="flex items-center gap-2 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4 text-accent" /> Верификация: Уровень 3
-                </li>
-              </ul>
+            </Link>
+          ))}
+          {filteredProducts.length === 0 && (
+            <div className="col-span-full text-center py-12">
+              <Tag className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 text-sm">Нет товаров по выбранному фильтру</p>
             </div>
-            <Link href="/catalog" className="w-full py-3 rounded-full bg-primary text-white font-bold text-sm z-10 hover:bg-primary-dark transition-colors text-center block">Смотреть каталог</Link>
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
-          </div>
+          )}
         </div>
       )}
 
@@ -211,8 +272,10 @@ export default function FeedPage() {
                       {mounted ? new Date(req.createdAt).toLocaleDateString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''} · {req.authorName}
                     </span>
                   </div>
-                  <h3 className="text-xl font-heading font-semibold leading-tight mb-2 text-secondary">{req.title}</h3>
-                  <p className="text-slate-600 mb-4 text-sm">{req.description}</p>
+                  <Link href={`/request/${req.id}`}>
+                    <h3 className="text-xl font-heading font-semibold leading-tight mb-2 text-secondary hover:text-primary transition-colors">{req.title}</h3>
+                  </Link>
+                  <p className="text-slate-600 mb-4 text-sm line-clamp-2">{req.description}</p>
                   
                   <div className="flex items-center gap-4 mb-4 text-sm font-medium text-slate-700">
                     <span className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
@@ -230,8 +293,8 @@ export default function FeedPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-xs font-medium text-slate-400">{req.responsesCount} откликов</span>
-                      <Link href="/create" className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
-                        Откликнуться <ArrowRight className="w-4 h-4" />
+                      <Link href={`/request/${req.id}`} className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
+                        Подробнее <ArrowRight className="w-4 h-4" />
                       </Link>
                     </div>
                   </div>

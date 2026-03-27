@@ -1,14 +1,24 @@
 'use client';
 
-import { Building2, Wrench, Truck, Layers, Wallet, Camera, Clock, Shield, XCircle, CheckCircle2, ArrowRight, Package } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Building2, Wrench, Truck, Layers, Wallet, Camera, Clock, Shield, XCircle, CheckCircle2, ArrowRight, Package, ChevronDown, ChevronRight, Lightbulb, Search } from 'lucide-react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { createMockRequest, getMockRequestsByAuthor, getMockRequestsForSupplier, updateRequestStatus, getStatusLabel, getStatusColor, type NomenclatureCategory, type RequestStatus } from '@/lib/mockDb';
+import { createMockRequest, getMockRequestsByAuthor, getMockRequestsForSupplier, updateRequestStatus, getStatusLabel, getStatusColor, getProductById, nomenclatureGroups, type NomenclatureCategory, type NomenclatureType, type RequestStatus } from '@/lib/mockDb';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 export default function CreatePage() {
+  return (
+    <Suspense fallback={<div className="max-w-3xl mx-auto px-4 pt-10 pb-24 text-center text-slate-400">Загрузка...</div>}>
+      <CreatePageInner />
+    </Suspense>
+  );
+}
+
+function CreatePageInner() {
   const { user, userData, canAccessRequests, openAuthModal } = useAuth();
-  const isSupplier = userData?.role === 'supplier';
+  const searchParams = useSearchParams();
+  const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
   const [category, setCategory] = useState<NomenclatureCategory>('Товар');
   const [title, setTitle] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -19,6 +29,48 @@ export default function CreatePage() {
   const [supplierRequests, setSupplierRequests] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'create' | 'my'>('create');
+
+  // Clarification fields (nomenclature)
+  const [showClarifications, setShowClarifications] = useState(false);
+  const [nomType, setNomType] = useState<NomenclatureType | ''>('');
+  const [groupId, setGroupId] = useState('');
+  const [charValues, setCharValues] = useState<Record<string, string>>({});
+  const [linkedProductId, setLinkedProductId] = useState<string | undefined>(undefined);
+
+  // Pre-fill from product
+  useEffect(() => {
+    const productId = searchParams.get('productId');
+    if (productId) {
+      const product = getProductById(productId);
+      if (product) {
+        setCategory(product.nomenclatureCategory);
+        setTitle(product.name);
+        setDescription(`Заявка на товар: ${product.name} (${product.supplierName}). ${product.description}`);
+        setUnit(product.unit);
+        setNomType(product.nomenclatureType);
+        setGroupId(product.groupId);
+        setCharValues(product.characteristics || {});
+        setLinkedProductId(product.id);
+        setShowClarifications(true);
+      }
+    }
+  }, [searchParams]);
+
+  // Nomenclature helpers
+  const availableTypes = useMemo(() => {
+    const types = new Set<NomenclatureType>();
+    nomenclatureGroups.filter(g => g.category === category).forEach(g => types.add(g.type));
+    return Array.from(types);
+  }, [category]);
+
+  const availableGroups = useMemo(() => {
+    if (!nomType) return [];
+    return nomenclatureGroups.filter(g => g.category === category && g.type === nomType);
+  }, [category, nomType]);
+
+  const selectedGroup = useMemo(() => {
+    return nomenclatureGroups.find(g => g.id === groupId);
+  }, [groupId]);
 
   useEffect(() => {
     setMounted(true);
@@ -67,6 +119,11 @@ export default function CreatePage() {
       authorName: userData?.name || 'Пользователь',
       title,
       category,
+      type: nomType || undefined,
+      groupId: groupId || undefined,
+      groupName: selectedGroup?.name || undefined,
+      characteristics: Object.keys(charValues).length > 0 ? charValues : undefined,
+      linkedProductId,
       description,
       budget: Number(budget) || 0,
       quantity: Number(quantity),
@@ -115,18 +172,21 @@ export default function CreatePage() {
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${req.category === 'Товар' ? 'bg-secondary text-white' : 'bg-primary/10 text-primary'}`}>{req.category}</span>
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusColor(req.status)}`}>{getStatusLabel(req.status)}</span>
                     </div>
-                    <h3 className="text-base font-bold text-secondary">{req.title}</h3>
+                    <Link href={`/request/${req.id}`} className="text-base font-bold text-secondary hover:text-primary transition-colors">{req.title}</Link>
                     <p className="text-xs text-slate-500 mt-1">{req.authorName} · {req.region}</p>
                   </div>
                   <span className="text-xs text-slate-400 whitespace-nowrap">{mounted ? new Date(req.createdAt).toLocaleDateString('ru-RU') : ''}</span>
                 </div>
-                <p className="text-sm text-slate-600 mb-3">{req.description}</p>
+                <p className="text-sm text-slate-600 mb-3 line-clamp-2">{req.description}</p>
                 <div className="flex items-center gap-3 mb-4 text-sm">
                   <span className="bg-slate-50 px-3 py-1 rounded-lg text-slate-600"><Layers className="w-3 h-3 inline" /> {req.quantity} {req.unit}</span>
                   <span className="bg-slate-50 px-3 py-1 rounded-lg text-slate-600"><Wallet className="w-3 h-3 inline" /> {req.budget.toLocaleString()} KGS</span>
                 </div>
                 {/* Supplier actions */}
                 <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-100">
+                  <Link href={`/request/${req.id}`} className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors">
+                    Подробнее
+                  </Link>
                   {req.status === 'OPEN' && (
                     <button onClick={() => handleStatusChange(req.id, 'ASSIGNED')} className="px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-dark transition-colors">
                       Взять в работу
@@ -243,6 +303,86 @@ export default function CreatePage() {
                       <span className="text-[10px] text-slate-500 font-medium">Добавить</span>
                     </div>
                   </div>
+                </div>
+
+                {/* Clarifications (Уточнения) */}
+                <div className="space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowClarifications(!showClarifications)}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${showClarifications ? 'border-primary bg-primary/5' : 'border-dashed border-slate-300 hover:border-primary/30 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Lightbulb className={`w-5 h-5 ${showClarifications ? 'text-primary' : 'text-slate-400'}`} />
+                      <div className="text-left">
+                        <span className={`text-sm font-semibold ${showClarifications ? 'text-primary' : 'text-slate-700'}`}>Добавить уточнения</span>
+                        <p className="text-xs text-slate-400">Укажите вид, группу и характеристики — поставщики быстрее найдут нужное</p>
+                      </div>
+                    </div>
+                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showClarifications ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showClarifications && (
+                    <div className="bg-blue-50/50 rounded-2xl p-5 border border-blue-100 space-y-5">
+                      <div className="flex items-start gap-2 text-xs text-blue-600 bg-blue-100/50 rounded-lg p-3">
+                        <Lightbulb className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>Чем точнее вы укажете параметры, тем быстрее поставщики найдут именно то, что вам нужно. Уточнения необязательны, но значительно повышают шанс получить подходящее предложение.</span>
+                      </div>
+
+                      {/* Вид */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-2">
+                          <ChevronRight className="w-4 h-4" /> Вид
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {availableTypes.map(t => (
+                            <button key={t} type="button" onClick={() => { setNomType(nomType === t ? '' : t); setGroupId(''); setCharValues({}); }} className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${nomType === t ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Группа */}
+                      {nomType && availableGroups.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-2">
+                            <ChevronRight className="w-4 h-4" /> Группа
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {availableGroups.map(g => (
+                              <button key={g.id} type="button" onClick={() => { setGroupId(groupId === g.id ? '' : g.id); setCharValues({}); }} className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${groupId === g.id ? 'bg-secondary text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+                                {g.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Характеристики */}
+                      {selectedGroup && selectedGroup.characteristics.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-2">
+                            <ChevronRight className="w-4 h-4" /> Характеристики ({selectedGroup.name})
+                          </label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {selectedGroup.characteristics.map(ch => (
+                              <div key={ch} className="space-y-1">
+                                <label className="text-xs font-semibold text-slate-600">{ch}</label>
+                                <input
+                                  type="text"
+                                  value={charValues[ch] || ''}
+                                  onChange={(e) => setCharValues(prev => ({ ...prev, [ch]: e.target.value }))}
+                                  placeholder={ch}
+                                  className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-primary/20 transition-all outline-none text-sm"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button type="submit" className="w-full bg-primary text-white font-heading font-bold py-4 rounded-xl shadow-lg shadow-primary/20 hover:bg-primary-dark active:scale-95 transition-all">
