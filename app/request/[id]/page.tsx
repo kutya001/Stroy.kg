@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, MapPin, Layers, Wallet, Clock, Package, CheckCircle2, XCircle, MessageSquare, ArrowRight, Shield, User } from 'lucide-react';
+import { ArrowLeft, ChevronRight, MapPin, Layers, Wallet, Clock, Package, CheckCircle2, XCircle, MessageSquare, ArrowRight, Shield, User, Pencil } from 'lucide-react';
 import { getRequestById, getProductById, getStatusLabel, getStatusColor, updateRequestStatus, type RequestStatus } from '@/lib/mockDb';
 import { useAuth } from '@/components/AuthProvider';
 import { useState, useEffect } from 'react';
@@ -75,7 +75,14 @@ export default function RequestDetailPage() {
                 {getStatusLabel(req.status)}
               </span>
             </div>
-            <h1 className="text-2xl font-heading font-bold text-secondary mb-3">{req.title}</h1>
+            <div className="flex items-center justify-between mb-3">
+              <h1 className="text-2xl font-heading font-bold text-secondary">{req.title}</h1>
+              {user && req.authorId === user.uid && req.status === 'OPEN' && (
+                <Link href={`/create?editId=${req.id}`} className="flex items-center gap-1.5 px-4 py-2 bg-primary/10 text-primary text-sm font-bold rounded-xl hover:bg-primary/20 transition-colors shrink-0">
+                  <Pencil className="w-4 h-4" /> Редактировать
+                </Link>
+              )}
+            </div>
             <p className="text-slate-600 text-sm leading-relaxed mb-4">{req.description}</p>
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <User className="w-4 h-4" />

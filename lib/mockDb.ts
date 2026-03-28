@@ -991,6 +991,15 @@ export const updateRequestStatus = (id: string, status: RequestStatus, supplierI
   return null;
 };
 
+export const updateMockRequest = (id: string, data: Partial<MockRequest>) => {
+  const index = requests.findIndex(r => r.id === id);
+  if (index !== -1 && requests[index].status === 'OPEN') {
+    requests[index] = { ...requests[index], ...data };
+    return requests[index];
+  }
+  return null;
+};
+
 export const getMockRequestsByAuthor = (authorId: string) => {
   return requests.filter(r => r.authorId === authorId);
 };
