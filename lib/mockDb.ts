@@ -60,7 +60,7 @@ export const nomenclatureGroups: NomenclatureGroup[] = [
 ];
 
 // Этапы строительства — для фильтрации
-export const constructionStages = [
+export let constructionStages = [
   'Проектирование',
   'Геодезия',
   'Фундамент',
@@ -196,6 +196,188 @@ export const mockUsers: MockUser[] = [
     emailVerified: false,
     inn: '55667788990011',
     subscription: 'BASIC',
+  },
+  // === Тестовые поставщики ===
+  {
+    uid: 'supplier-t1',
+    name: 'Тест Поставщик 1',
+    phone: '+996555100001',
+    email: 'sup1@stroy.kg',
+    password: '123456',
+    role: 'supplier',
+    companyName: 'ТестПоставщик-1',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 2,
+    phoneVerified: true,
+    emailVerified: true,
+    inn: '10000000000001',
+    subscription: 'BASIC',
+  },
+  {
+    uid: 'supplier-t2',
+    name: 'Тест Поставщик 2',
+    phone: '+996555100002',
+    email: 'sup2@stroy.kg',
+    password: '123456',
+    role: 'supplier',
+    companyName: 'ТестПоставщик-2',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 2,
+    phoneVerified: true,
+    emailVerified: true,
+    inn: '10000000000002',
+    subscription: 'FREE',
+  },
+  {
+    uid: 'supplier-t3',
+    name: 'Тест Поставщик 3',
+    phone: '+996555100003',
+    email: 'sup3@stroy.kg',
+    password: '123456',
+    role: 'supplier',
+    companyName: 'ТестПоставщик-3',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 1,
+    phoneVerified: true,
+    emailVerified: true,
+    subscription: 'FREE',
+  },
+  {
+    uid: 'supplier-t4',
+    name: 'Тест Поставщик 4',
+    phone: '+996555100004',
+    email: 'sup4@stroy.kg',
+    password: '123456',
+    role: 'supplier',
+    companyName: 'ТестПоставщик-4',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 0,
+    phoneVerified: true,
+    emailVerified: false,
+    subscription: 'FREE',
+  },
+  {
+    uid: 'supplier-t5',
+    name: 'Тест Поставщик 5',
+    phone: '+996555100005',
+    email: 'sup5@stroy.kg',
+    password: '123456',
+    role: 'supplier',
+    companyName: 'ТестПоставщик-5',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 0,
+    phoneVerified: true,
+    emailVerified: false,
+    subscription: 'FREE',
+  },
+  // === Тестовые покупатели ===
+  {
+    uid: 'consumer-t1',
+    name: 'Тест Покупатель 1',
+    phone: '+996555200001',
+    email: 'con1@stroy.kg',
+    password: '123456',
+    role: 'consumer',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 2,
+    phoneVerified: true,
+    emailVerified: true,
+    inn: '20000000000001',
+    subscription: 'FREE',
+  },
+  {
+    uid: 'consumer-t2',
+    name: 'Тест Покупатель 2',
+    phone: '+996555200002',
+    email: 'con2@stroy.kg',
+    password: '123456',
+    role: 'consumer',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 1,
+    phoneVerified: true,
+    emailVerified: true,
+    subscription: 'FREE',
+  },
+  {
+    uid: 'consumer-t3',
+    name: 'Тест Покупатель 3',
+    phone: '+996555200003',
+    email: 'con3@stroy.kg',
+    password: '123456',
+    role: 'consumer',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 0,
+    phoneVerified: true,
+    emailVerified: false,
+    subscription: 'FREE',
+  },
+  {
+    uid: 'consumer-t4',
+    name: 'Тест Покупатель 4',
+    phone: '+996555200004',
+    email: 'con4@stroy.kg',
+    password: '123456',
+    role: 'consumer',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 0,
+    phoneVerified: true,
+    emailVerified: false,
+    subscription: 'FREE',
+  },
+  {
+    uid: 'consumer-t5',
+    name: 'Тест Покупатель 5',
+    phone: '+996555200005',
+    email: 'con5@stroy.kg',
+    password: '123456',
+    role: 'consumer',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 0,
+    phoneVerified: true,
+    emailVerified: false,
+    subscription: 'FREE',
+  },
+  // === Тестовые застройщики ===
+  {
+    uid: 'developer-t1',
+    name: 'Тест Застройщик 1',
+    phone: '+996555300001',
+    email: 'dev1@stroy.kg',
+    password: '123456',
+    role: 'developer',
+    companyName: 'ТестЗастройщик-1',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 2,
+    phoneVerified: true,
+    emailVerified: true,
+    inn: '30000000000001',
+    subscription: 'BASIC',
+  },
+  {
+    uid: 'developer-t2',
+    name: 'Тест Застройщик 2',
+    phone: '+996555300002',
+    email: 'dev2@stroy.kg',
+    password: '123456',
+    role: 'developer',
+    companyName: 'ТестЗастройщик-2',
+    onboardingCompleted: true,
+    createdAt: new Date().toISOString(),
+    verificationLevel: 1,
+    phoneVerified: true,
+    emailVerified: true,
+    subscription: 'FREE',
   },
 ];
 
@@ -1008,3 +1190,59 @@ export async function submitLicenseVerification(uid: string, license: string): P
   // TODO: Replace with real license verification
   throw new Error('Real license verification not configured');
 }
+
+// ==========================================
+// NOMENCLATURE GROUPS CRUD
+// ==========================================
+
+let nomenclatureGroupsStore = [...nomenclatureGroups];
+
+export const getAllNomenclatureGroups = () => [...nomenclatureGroupsStore];
+
+export const createNomenclatureGroup = (data: Omit<NomenclatureGroup, 'id'>): NomenclatureGroup => {
+  const newGroup: NomenclatureGroup = {
+    id: `grp-${Date.now()}`,
+    ...data,
+  };
+  nomenclatureGroupsStore.push(newGroup);
+  return newGroup;
+};
+
+export const updateNomenclatureGroup = (id: string, data: Partial<NomenclatureGroup>) => {
+  const index = nomenclatureGroupsStore.findIndex(g => g.id === id);
+  if (index !== -1) {
+    nomenclatureGroupsStore[index] = { ...nomenclatureGroupsStore[index], ...data };
+    return nomenclatureGroupsStore[index];
+  }
+  return null;
+};
+
+export const deleteNomenclatureGroup = (id: string) => {
+  nomenclatureGroupsStore = nomenclatureGroupsStore.filter(g => g.id !== id);
+};
+
+// ==========================================
+// CONSTRUCTION STAGES CRUD
+// ==========================================
+
+export const getAllConstructionStages = () => [...constructionStages];
+
+export const addConstructionStage = (name: string) => {
+  if (!constructionStages.includes(name)) {
+    constructionStages.push(name);
+  }
+  return [...constructionStages];
+};
+
+export const removeConstructionStage = (name: string) => {
+  constructionStages = constructionStages.filter(s => s !== name);
+  return [...constructionStages];
+};
+
+export const updateConstructionStage = (oldName: string, newName: string) => {
+  const index = constructionStages.indexOf(oldName);
+  if (index !== -1) {
+    constructionStages[index] = newName;
+  }
+  return [...constructionStages];
+};
