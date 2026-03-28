@@ -5,26 +5,28 @@ applyTo: "**/*.{ts,tsx}"
 
 ## Технологический стек
 - Next.js 15 (App Router), TypeScript (строгая типизация), Tailwind CSS 4
-- Firebase: Firestore (БД) + Firebase Auth (аутентификация)
+- Supabase: PostgreSQL (БД) + Supabase Auth (аутентификация)
 - Иконки: только `lucide-react`
 - Шрифты: `Unbounded` (заголовки, `font-heading`), `Golos Text` (основной, `font-body`)
 
 ## Архитектура компонентов
 - Только функциональные компоненты и хуки — никаких классов
-- `'use client'` только при наличии хуков состояния, обработчиков событий или Firebase Auth
+- `'use client'` только при наличии хуков состояния, обработчиков событий или Supabase SDK
 - Контексты и провайдеры → `components/` или `lib/`
 - TypeScript-интерфейсы рядом с логикой или в файлах типов
-- Firebase инкапсулировать в провайдерах (`AuthProvider`) или кастомных хуках
+- Supabase инкапсулировать в провайдерах (`AuthProvider`) или кастомных хуках
 
 ## Ролевая модель (4 роли)
 - `consumer` (заказчик), `supplier` (поставщик), `developer` (застройщик), `admin`
 - UI рендерится по `effectiveRole` из `AuthProvider` (учитывает admin view-as)
 - Гейты доступа: `canAccessChat` и `canAccessRequests` → `verificationLevel >= 2`
 
-## Mock-first разработка
-- Все данные через `lib/mockDb.ts` (in-memory хранилище)
-- `VERIFICATION_CONFIG.useMock = true` → mock-режим без реального Firebase
-- Новые фичи сначала реализовать в mock, затем переносить на Firestore
+## Dual-mode разработка (Mock / Supabase)
+- Dual-mode: `USE_SUPABASE` флаг проверяет наличие env-переменных `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Без env-переменных → mock-режим (`lib/mockDb.ts`, in-memory)
+- С env-переменными → Supabase (PostgreSQL + Auth)
+- Async data access layer: `lib/queries.ts` (маппинг snake_case → camelCase)
+- Supabase клиенты: `lib/supabase/client.ts` (browser), `lib/supabase/server.ts` (SSR)
 
 ## Номенклатура (иерархия товаров)
 - 4 уровня: Категория (`Товар`/`Услуга`) → Вид → Группа → Наименование

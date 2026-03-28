@@ -1,8 +1,18 @@
 import type { MetadataRoute } from 'next';
 import { getAllMockProducts } from '@/lib/mockDb';
+import { createClient } from '@/lib/supabase/server';
+import { getAllProducts } from '@/lib/queries';
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const products = getAllMockProducts(true);
+const USE_SUPABASE = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  let products;
+  if (USE_SUPABASE) {
+    const supabase = await createClient();
+    products = await getAllProducts(supabase, true);
+  } else {
+    products = getAllMockProducts(true);
+  }
 
   const productEntries: MetadataRoute.Sitemap = products.map((product) => ({
     url: `https://stroy.kg/product/${product.id}`,

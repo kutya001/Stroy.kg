@@ -1,17 +1,22 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { getMockUser, getMockUserByEmail, createMockUser, updateMockUser, type MockUser, type UserRole, type VerificationLevel } from '@/lib/mockDb';
+import { createClient } from '@/lib/supabase/client';
+import { getProfile, updateProfile as updateProfileQuery, getProfileByPhone, getProfileByEmail } from '@/lib/queries';
 import AuthModal from './AuthModal';
 import OnboardingModal from './OnboardingModal';
+
+// Режим работы: Supabase или mock
+const USE_SUPABASE = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 interface AuthContextType {
   user: MockUser | null;
   userData: MockUser | null;
   loading: boolean;
   openAuthModal: () => void;
+  loginWithEmail: (email: string, password: string, role?: UserRole) => Promise<void>;
   loginWithPhone: (phone: string, role?: UserRole, password?: string) => Promise<void>;
-  loginWithEmail: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<MockUser>) => Promise<void>;
   canAccessChat: boolean;
@@ -27,8 +32,8 @@ const AuthContext = createContext<AuthContextType>({
   userData: null,
   loading: true,
   openAuthModal: () => {},
-  loginWithPhone: async () => {},
   loginWithEmail: async () => {},
+  loginWithPhone: async () => {},
   logout: async () => {},
   updateProfile: async () => {},
   canAccessChat: false,
@@ -48,21 +53,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const [adminViewAs, setAdminViewAs] = useState<UserRole | null>(null);
 
+  // Инициализация сессии
   useEffect(() => {
-    const storedUser = localStorage.getItem('mockUser');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setUserData(parsedUser);
-        if (!parsedUser.onboardingCompleted) {
-          setIsOnboardingModalOpen(true);
+    if (USE_SUPABASE) {
+      const supabase = createClient();
+      supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
+        if (authUser) {
+          const profile = await getProfile(supabase, authUser.id);
+          if (profile) {
+            setUser(profile);
+            setUserData(profile);
+            if (!profile.onboardingCompleted) {
+              setIsOnboardingModalOpen(true);
+            }
+          }
         }
-      } catch {
-        localStorage.removeItem('mockUser');
+        setLoading(false);
+      });
+
+      // Слушаем изменения сессии (логин/логаут)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const profile = await getProfile(supabase, session.user.id);
+          if (profile) {
+            setUser(profile);
+            setUserData(profile);
+            if (!profile.onboardingCompleted) {
+              setIsOnboardingModalOpen(true);
+            }
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setUserData(null);
+          setAdminViewAs(null);
+        }
+      });
+
+      return () => { subscription.unsubscribe(); };
+    } else {
+      // Mock-режим (как раньше)
+      const storedUser = localStorage.getItem('mockUser');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+          setUserData(parsedUser);
+          if (!parsedUser.onboardingCompleted) {
+            setIsOnboardingModalOpen(true);
+          }
+        } catch {
+          localStorage.removeItem('mockUser');
+        }
       }
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   // Admin role switching: override userData.role when viewing as another role
@@ -77,51 +121,86 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const openAuthModal = () => setIsAuthModalOpen(true);
 
-  const loginWithPhone = async (phone: string, role: UserRole = 'consumer', password?: string) => {
+  const loginWithEmail = async (email: string, password: string, role?: UserRole) => {
     setLoading(true);
     try {
-      let existingUser = getMockUser(phone);
-      
-      if (existingUser && existingUser.role === 'admin') {
-        if (existingUser.password !== password) {
-          throw new Error('Неверный пароль администратора');
+      if (USE_SUPABASE) {
+        const supabase = createClient();
+        // Пробуем войти по email+пароль
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          // Если пользователь не найден — регистрируем
+          if (error.message.includes('Invalid login credentials')) {
+            const { error: signUpError } = await supabase.auth.signUp({
+              email,
+              password,
+              options: { data: { role: role || 'consumer' } },
+            });
+            if (signUpError) throw new Error(signUpError.message);
+            // После signUp onAuthStateChange обновит состояние
+          } else {
+            throw new Error(error.message);
+          }
         }
+        // onAuthStateChange обработает SIGNED_IN
+        setIsAuthModalOpen(false);
+      } else {
+        // Mock-режим: ищем по email
+        let existingUser = getMockUserByEmail(email);
+        if (existingUser) {
+          // Проверяем пароль (если есть)
+          if (existingUser.password && existingUser.password !== password) {
+            throw new Error('Неверный пароль');
+          }
+        } else {
+          // Пользователь не найден — ищем по телефону тоже нет, создаём нового
+          throw new Error('Пользователь не найден. Зарегистрируйтесь по номеру телефона.');
+        }
+        setUser(existingUser);
+        setUserData(existingUser);
+        localStorage.setItem('mockUser', JSON.stringify(existingUser));
+        if (!existingUser.onboardingCompleted) {
+          setIsOnboardingModalOpen(true);
+        }
+        setIsAuthModalOpen(false);
       }
-
-      if (!existingUser) {
-        existingUser = createMockUser(phone, role);
-      }
-      
-      setUser(existingUser);
-      setUserData(existingUser);
-      localStorage.setItem('mockUser', JSON.stringify(existingUser));
-      
-      if (!existingUser.onboardingCompleted) {
-        setIsOnboardingModalOpen(true);
-      }
-      setIsAuthModalOpen(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const loginWithEmail = async (email: string) => {
+  const loginWithPhone = async (phone: string, role: UserRole = 'consumer', password?: string) => {
     setLoading(true);
     try {
-      const existingUser = getMockUserByEmail(email);
-      if (!existingUser) {
-        throw new Error('Пользователь с такой почтой не найден');
+      if (USE_SUPABASE) {
+        // Телефонная авторизация — заглушка (не поддерживается в текущей конфигурации)
+        throw new Error('Вход по телефону временно недоступен. Используйте почту и пароль.');
+      } else {
+        let existingUser = getMockUser(phone);
+        if (existingUser && existingUser.password && existingUser.password !== password) {
+          throw new Error('Неверный пароль');
+        }
+        if (!existingUser) {
+          existingUser = createMockUser(phone, role);
+        }
+        setUser(existingUser);
+        setUserData(existingUser);
+        localStorage.setItem('mockUser', JSON.stringify(existingUser));
+        if (!existingUser.onboardingCompleted) {
+          setIsOnboardingModalOpen(true);
+        }
+        setIsAuthModalOpen(false);
       }
-      setUser(existingUser);
-      setUserData(existingUser);
-      localStorage.setItem('mockUser', JSON.stringify(existingUser));
-      setIsAuthModalOpen(false);
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
+    if (USE_SUPABASE) {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    }
     setUser(null);
     setUserData(null);
     setAdminViewAs(null);
@@ -129,7 +208,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProfile = async (data: Partial<MockUser>) => {
-    if (user) {
+    if (!user) return;
+    if (USE_SUPABASE) {
+      const supabase = createClient();
+      const updated = await updateProfileQuery(supabase, user.uid, data);
+      if (updated) {
+        setUser(updated);
+        setUserData(updated);
+      }
+    } else {
       const updated = updateMockUser(user.uid, data);
       if (updated) {
         setUser(updated);

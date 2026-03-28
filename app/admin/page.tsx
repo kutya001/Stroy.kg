@@ -7,12 +7,12 @@ import {
   type MockUser, type VerificationLevel, type NomenclatureCategory, type NomenclatureType, type NomenclatureGroup,
   getAllNomenclatureGroups, createNomenclatureGroup, updateNomenclatureGroup, deleteNomenclatureGroup,
   getAllConstructionStages, addConstructionStage, removeConstructionStage, updateConstructionStage,
-  getAllMockRequests, getProductsBySupplierId, type RequestStatus,
+  getAllMockRequests, getProductsBySupplierId, type RequestStatus, resetMockData,
 } from '@/lib/mockDb';
-import { Loader2, ShieldAlert, BadgeCheck, Users, ArrowUp, Eye, BookOpen, BarChart3, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
+import { Loader2, ShieldAlert, BadgeCheck, Users, ArrowUp, Eye, BookOpen, BarChart3, Plus, Pencil, Trash2, X, Save, Database, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-type AdminTab = 'users' | 'directories' | 'analytics';
+type AdminTab = 'users' | 'directories' | 'analytics' | 'demo';
 
 export default function AdminPage() {
   const { user, userData, loading: authLoading, isAdminMode, adminViewAs, setAdminViewAs } = useAuth();
@@ -119,12 +119,19 @@ export default function AdminPage() {
         <button onClick={() => setActiveTab('analytics')} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'analytics' ? 'bg-primary text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
           <BarChart3 className="w-4 h-4" /> Аналитика
         </button>
+        <button onClick={() => setActiveTab('demo')} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'demo' ? 'bg-primary text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+          <Database className="w-4 h-4" /> Демо-данные
+        </button>
       </div>
 
       {/* Tab Content */}
       {activeTab === 'users' && <UsersTab allUsers={allUsers} pendingUsers={pendingUsers} verifiedUsers={verifiedUsers} onVerificationUp={handleVerificationUp} />}
       {activeTab === 'directories' && <DirectoriesTab />}
       {activeTab === 'analytics' && <AnalyticsTab allUsers={allUsers} />}
+      {activeTab === 'demo' && <DemoTab onDataReset={() => {
+        const allU = getAllMockUsers();
+        setAllUsers(allU.filter(u => u.role !== 'admin'));
+      }} />}
     </main>
   );
 }
@@ -623,6 +630,96 @@ function AnalyticsTab({ allUsers }: { allUsers: MockUser[] }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ==========================================
+// DEMO DATA TAB
+// ==========================================
+function DemoTab({ onDataReset }: { onDataReset: () => void }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+
+  const handleResetMockData = () => {
+    setStatus('loading');
+    setTimeout(() => {
+      resetMockData();
+      onDataReset();
+      setStatus('success');
+      setTimeout(() => setStatus('idle'), 2000);
+    }, 500);
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Mock Data Reset */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h2 className="text-xl font-semibold text-secondary">Генерация демо-данных (Mock)</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            Сбрасывает все данные в памяти к исходным демонстративным: пользователи, товары, заявки, уведомления, чаты.
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-amber-800">
+              <strong>Внимание:</strong> Все текущие изменения будут потеряны. Данные будут восстановлены к начальному демо-состоянию.
+            </p>
+          </div>
+          <button
+            onClick={handleResetMockData}
+            disabled={status === 'loading'}
+            className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {status === 'loading' ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <RefreshCw className="w-5 h-5" />
+            )}
+            {status === 'success' ? 'Данные восстановлены!' : 'Сгенерировать демо-данные'}
+          </button>
+          {status === 'success' && (
+            <p className="mt-3 text-sm text-green-600">Все данные успешно восстановлены к исходному состоянию.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Supabase SQL Scripts Info */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h2 className="text-xl font-semibold text-secondary">SQL скрипты (Supabase)</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            Для генерации демо-данных в Supabase используйте SQL скрипты из папки <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">lib/supabase/</code>
+          </p>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl">
+            <Database className="w-6 h-6 text-primary mt-0.5 shrink-0" />
+            <div>
+              <h3 className="font-bold text-secondary text-sm">migration.sql</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Схема БД: таблицы, индексы, RLS, триггеры. Выполняйте первым.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl">
+            <Database className="w-6 h-6 text-green-500 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="font-bold text-secondary text-sm">seed-data.sql</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Демонстративные данные: пользователи, товары, заявки, чаты. Выполняйте после migration.sql.</p>
+              <p className="text-xs text-slate-400 mt-1">Логины: admin@stroy.kg / admin123, остальные / 123456</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl">
+            <Database className="w-6 h-6 text-red-500 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="font-bold text-secondary text-sm">cleanup.sql</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Полная очистка всех таблиц и auth.users. Используйте для сброса БД.</p>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400">
+            Выполняйте скрипты через Supabase Dashboard → SQL Editor
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

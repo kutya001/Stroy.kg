@@ -2,8 +2,28 @@ import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Star, BadgeCheck, MapPin, Megaphone, Package, Tag, ChevronRight } from 'lucide-react';
-import { getProductById, getProductsBySupplierId } from '@/lib/mockDb';
+import { getProductById as getProductByIdMock, getProductsBySupplierId as getProductsBySupplierIdMock } from '@/lib/mockDb';
+import { createClient } from '@/lib/supabase/server';
+import { getProductById as getProductByIdDb, getProductsBySupplierId as getProductsBySupplierIdDb } from '@/lib/queries';
 import ProductActions from './ProductActions';
+
+const USE_SUPABASE = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+async function fetchProduct(id: string) {
+  if (USE_SUPABASE) {
+    const supabase = await createClient();
+    return getProductByIdDb(supabase, id);
+  }
+  return getProductByIdMock(id);
+}
+
+async function fetchSupplierProducts(supplierId: string) {
+  if (USE_SUPABASE) {
+    const supabase = await createClient();
+    return getProductsBySupplierIdDb(supabase, supplierId);
+  }
+  return getProductsBySupplierIdMock(supplierId);
+}
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -11,7 +31,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const product = getProductById(id);
+  const product = await fetchProduct(id);
 
   if (!product) return { title: 'Товар не найден | Stroy.kg' };
 
@@ -31,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductDetailPage({ params }: Props) {
   const { id } = await params;
-  const product = getProductById(id);
+  const product = await fetchProduct(id);
 
   if (!product) {
     return (
@@ -44,7 +64,8 @@ export default async function ProductDetailPage({ params }: Props) {
     );
   }
 
-  const otherProducts = getProductsBySupplierId(product.supplierId)
+  const allSupplierProducts = await fetchSupplierProducts(product.supplierId);
+  const otherProducts = allSupplierProducts
     .filter(op => op.id !== product.id && op.isPublished)
     .slice(0, 3);
 

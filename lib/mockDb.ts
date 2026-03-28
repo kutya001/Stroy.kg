@@ -1255,3 +1255,20 @@ export const updateConstructionStage = (oldName: string, newName: string) => {
   }
   return [...constructionStages];
 };
+
+// ==========================================
+// RESET / DEMO DATA GENERATION
+// ==========================================
+
+export const resetMockData = () => {
+  users = [...mockUsers];
+  products = [...mockProducts];
+  requests = [...mockRequests];
+  notifications = [...mockNotifications];
+  chats = [...mockChats];
+  nomenclatureGroupsStore = [...nomenclatureGroups];
+  constructionStages = [
+    'Проектирование', 'Геодезия', 'Фундамент', 'Каркас и стены',
+    'Кровля', 'Инженерные сети', 'Отделка', 'Благоустройство',
+  ];
+};

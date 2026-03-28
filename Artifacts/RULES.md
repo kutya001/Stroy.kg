@@ -6,14 +6,14 @@
 * **Стилизация:** Tailwind CSS 4, `tailwind-merge`, `clsx`, `class-variance-authority`.
 * **UI Компоненты и Иконки:** Только библиотека `lucide-react`.
 * **Анимации:** `motion` (Framer Motion).
-* **Аутентификация:** Supabase Auth (Phone/Email) или Custom JWT Auth (для on-premise).
+* **Аутентификация:** Supabase Auth (Email + Password). Вход по телефону — заглушка (stub) для будущей реализации.
 * **База данных:** Supabase (PostgreSQL) / On-premise PostgreSQL (на этапе MVP допускается использование `lib/mockDb.ts`).
-* **ORM / Query Builder:** Prisma ORM, Drizzle ORM или Supabase Client (в зависимости от финальной конфигурации).
+* **ORM / Query Builder:** Supabase Client (`@supabase/supabase-js` + `@supabase/ssr`), async data layer `lib/queries.ts`.
 
 ## 2. Архитектурные принципы
 * **Server/Client Components:** По умолчанию используются серверные компоненты (SSR/RSC). Директива `'use client'` применяется исключительно в файлах, содержащих хуки состояния (`useState`, `useEffect`), обработчики событий или интеграцию с клиентским SDK (например, `@supabase/ssr`).
 * **Функциональная парадигма:** Разрешены только функциональные компоненты и хуки.
-* **Mock-first разработка:** Разработка новых функций начинается в mock-режиме (`lib/mockDb.ts`). Для активации mock-режима флаг `VERIFICATION_CONFIG.useMock` устанавливается в `true`.
+* **Dual-mode разработка:** Приложение поддерживает два режима: mock (`lib/mockDb.ts`) и Supabase. Флаг `USE_SUPABASE` автоматически определяется по наличию env-переменных `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Async data access layer: `lib/queries.ts`.
 * **Инкапсуляция логики:** Интеграция с базой данных и API аутентификации должна быть абстрагирована на уровне сервисов (Server Actions / Route Handlers) или кастомных хуков.
 
 ## 3. UI/UX и Стилизация
@@ -41,3 +41,9 @@
 * **Robots.txt:** `app/robots.ts` закрывает приватные маршруты (`/admin`, `/profile`, `/chats`, `/create`, `/add-product`, `/dashboard`).
 * **Изображения:** Главное изображение товара (LCP) должно иметь атрибут `priority`. Атрибут `alt` — название товара, не «Product image».
 * **Breadcrumbs:** Навигационные хлебные крошки оборачивать в `<nav aria-label="Breadcrumb">` для доступности.
+
+## 7. SQL миграции и демо-данные
+* **Идемпотентность:** Все SQL-скрипты должны быть безопасны для повторного выполнения (`IF NOT EXISTS`, `ON CONFLICT`, `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object`).
+* **SQL скрипты** хранятся в `lib/supabase/`: `migration.sql` (схема), `seed-data.sql` (демо-данные), `cleanup.sql` (очистка).
+* **Mock-режим:** Функция `resetMockData()` в `lib/mockDb.ts` сбрасывает все in-memory хранилища к исходным демо-данным.
+* **Админ-панель:** Вкладка «Демо-данные» в `/admin` для генерации демо-данных (mock) и инфо по SQL-скриптам (Supabase).
