@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, MapPin, Layers, Wallet, Clock, Package, CheckCircle2, XCircle, MessageSquare, ArrowRight, Shield, User, Pencil } from 'lucide-react';
-import { getRequestById, getProductById, getStatusLabel, getStatusColor, updateRequestStatus, type RequestStatus } from '@/lib/mockDb';
+import { getRequestById, getProductById, updateRequestStatus } from '@/lib/data';
+import { getStatusLabel, getStatusColor, type RequestStatus } from '@/lib/mockDb';
 import { useAuth } from '@/components/AuthProvider';
 import { useState, useEffect } from 'react';
 
@@ -13,19 +14,24 @@ export default function RequestDetailPage() {
   const router = useRouter();
   const { user, userData, canAccessChat, openAuthModal } = useAuth();
   const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
-  const [req, setReq] = useState<ReturnType<typeof getRequestById>>(null);
+  const [req, setReq] = useState<Awaited<ReturnType<typeof getRequestById>>>(null);
+  const [linkedProduct, setLinkedProduct] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const id = params.id as string;
-    setReq(getRequestById(id));
+    getRequestById(id).then(r => {
+      setReq(r);
+      if (r?.linkedProductId) getProductById(r.linkedProductId).then(setLinkedProduct);
+    });
   }, [params.id]);
 
-  const handleStatusChange = (newStatus: RequestStatus) => {
+  const handleStatusChange = async (newStatus: RequestStatus) => {
     if (!req || !user) return;
-    updateRequestStatus(req.id, newStatus, isSupplier ? user.uid : undefined, isSupplier ? userData?.name : undefined);
-    setReq(getRequestById(req.id));
+    await updateRequestStatus(req.id, newStatus, isSupplier ? user.uid : undefined, isSupplier ? userData?.name : undefined);
+    const updated = await getRequestById(req.id);
+    setReq(updated);
   };
 
   const handleChatClick = () => {
@@ -46,8 +52,6 @@ export default function RequestDetailPage() {
       </main>
     );
   }
-
-  const linkedProduct = req.linkedProductId ? getProductById(req.linkedProductId) : null;
 
   return (
     <main className="max-w-5xl mx-auto px-4 pb-24 pt-6">

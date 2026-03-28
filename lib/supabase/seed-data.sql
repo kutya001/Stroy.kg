@@ -53,18 +53,18 @@ ON CONFLICT (id) DO NOTHING;
 -- Добавляем identities (требуется для Supabase auth)
 INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
 VALUES
-  (uid_admin,  uid_admin,  '{"sub":"' || uid_admin::text  || '","email":"admin@stroy.kg"}'::jsonb,      'email', uid_admin::text,  NOW(), NOW(), NOW()),
-  (uid_sup1,   uid_sup1,   '{"sub":"' || uid_sup1::text   || '","email":"stroymaster@mail.kg"}'::jsonb, 'email', uid_sup1::text,   NOW(), NOW(), NOW()),
-  (uid_sup2,   uid_sup2,   '{"sub":"' || uid_sup2::text   || '","email":"severles@mail.kg"}'::jsonb,    'email', uid_sup2::text,   NOW(), NOW(), NOW()),
-  (uid_con1,   uid_con1,   '{"sub":"' || uid_con1::text   || '","email":"ivan@mail.kg"}'::jsonb,        'email', uid_con1::text,   NOW(), NOW(), NOW()),
-  (uid_dev1,   uid_dev1,   '{"sub":"' || uid_dev1::text   || '","email":"smailov@mail.kg"}'::jsonb,     'email', uid_dev1::text,   NOW(), NOW(), NOW()),
-  (uid_sup_t1, uid_sup_t1, '{"sub":"' || uid_sup_t1::text || '","email":"sup1@stroy.kg"}'::jsonb,       'email', uid_sup_t1::text, NOW(), NOW(), NOW()),
-  (uid_sup_t2, uid_sup_t2, '{"sub":"' || uid_sup_t2::text || '","email":"sup2@stroy.kg"}'::jsonb,       'email', uid_sup_t2::text, NOW(), NOW(), NOW()),
-  (uid_sup_t3, uid_sup_t3, '{"sub":"' || uid_sup_t3::text || '","email":"sup3@stroy.kg"}'::jsonb,       'email', uid_sup_t3::text, NOW(), NOW(), NOW()),
-  (uid_con_t1, uid_con_t1, '{"sub":"' || uid_con_t1::text || '","email":"con1@stroy.kg"}'::jsonb,       'email', uid_con_t1::text, NOW(), NOW(), NOW()),
-  (uid_con_t2, uid_con_t2, '{"sub":"' || uid_con_t2::text || '","email":"con2@stroy.kg"}'::jsonb,       'email', uid_con_t2::text, NOW(), NOW(), NOW()),
-  (uid_con_t3, uid_con_t3, '{"sub":"' || uid_con_t3::text || '","email":"con3@stroy.kg"}'::jsonb,       'email', uid_con_t3::text, NOW(), NOW(), NOW()),
-  (uid_dev_t1, uid_dev_t1, '{"sub":"' || uid_dev_t1::text || '","email":"dev1@stroy.kg"}'::jsonb,       'email', uid_dev_t1::text, NOW(), NOW(), NOW())
+  (uid_admin,  uid_admin,  jsonb_build_object('sub', uid_admin::text,  'email', 'admin@stroy.kg'),      'email', uid_admin::text,  NOW(), NOW(), NOW()),
+  (uid_sup1,   uid_sup1,   jsonb_build_object('sub', uid_sup1::text,   'email', 'stroymaster@mail.kg'), 'email', uid_sup1::text,   NOW(), NOW(), NOW()),
+  (uid_sup2,   uid_sup2,   jsonb_build_object('sub', uid_sup2::text,   'email', 'severles@mail.kg'),    'email', uid_sup2::text,   NOW(), NOW(), NOW()),
+  (uid_con1,   uid_con1,   jsonb_build_object('sub', uid_con1::text,   'email', 'ivan@mail.kg'),        'email', uid_con1::text,   NOW(), NOW(), NOW()),
+  (uid_dev1,   uid_dev1,   jsonb_build_object('sub', uid_dev1::text,   'email', 'smailov@mail.kg'),     'email', uid_dev1::text,   NOW(), NOW(), NOW()),
+  (uid_sup_t1, uid_sup_t1, jsonb_build_object('sub', uid_sup_t1::text, 'email', 'sup1@stroy.kg'),       'email', uid_sup_t1::text, NOW(), NOW(), NOW()),
+  (uid_sup_t2, uid_sup_t2, jsonb_build_object('sub', uid_sup_t2::text, 'email', 'sup2@stroy.kg'),       'email', uid_sup_t2::text, NOW(), NOW(), NOW()),
+  (uid_sup_t3, uid_sup_t3, jsonb_build_object('sub', uid_sup_t3::text, 'email', 'sup3@stroy.kg'),       'email', uid_sup_t3::text, NOW(), NOW(), NOW()),
+  (uid_con_t1, uid_con_t1, jsonb_build_object('sub', uid_con_t1::text, 'email', 'con1@stroy.kg'),       'email', uid_con_t1::text, NOW(), NOW(), NOW()),
+  (uid_con_t2, uid_con_t2, jsonb_build_object('sub', uid_con_t2::text, 'email', 'con2@stroy.kg'),       'email', uid_con_t2::text, NOW(), NOW(), NOW()),
+  (uid_con_t3, uid_con_t3, jsonb_build_object('sub', uid_con_t3::text, 'email', 'con3@stroy.kg'),       'email', uid_con_t3::text, NOW(), NOW(), NOW()),
+  (uid_dev_t1, uid_dev_t1, jsonb_build_object('sub', uid_dev_t1::text, 'email', 'dev1@stroy.kg'),       'email', uid_dev_t1::text, NOW(), NOW(), NOW())
 ON CONFLICT (provider_id, provider) DO NOTHING;
 
 -- ============================================

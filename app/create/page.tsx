@@ -3,7 +3,8 @@
 import { Building2, Wrench, Truck, Layers, Wallet, Camera, Clock, Shield, XCircle, CheckCircle2, ArrowRight, Package, ChevronDown, ChevronRight, Lightbulb, Search, Pencil } from 'lucide-react';
 import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { createMockRequest, updateMockRequest, getRequestById, getMockRequestsByAuthor, getMockRequestsForSupplier, updateRequestStatus, getStatusLabel, getStatusColor, getProductById, nomenclatureGroups, type NomenclatureCategory, type NomenclatureType, type RequestStatus } from '@/lib/mockDb';
+import { createRequest, updateRequest, getRequestById, getRequestsByAuthor, getRequestsForSupplier, updateRequestStatus, getProductById } from '@/lib/data';
+import { getStatusLabel, getStatusColor, nomenclatureGroups, type NomenclatureCategory, type NomenclatureType, type RequestStatus } from '@/lib/mockDb';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -44,41 +45,43 @@ function CreatePageInner() {
   useEffect(() => {
     const editRequestId = searchParams.get('editId');
     if (editRequestId) {
-      const existing = getRequestById(editRequestId);
-      if (existing && existing.status === 'OPEN') {
-        setEditId(editRequestId);
-        setCategory(existing.category);
-        setTitle(existing.title);
-        setQuantity(String(existing.quantity));
-        setUnit(existing.unit);
-        setBudget(String(existing.budget));
-        setDescription(existing.description);
-        setNomType(existing.type || '');
-        setGroupId(existing.groupId || '');
-        setCharValues(existing.characteristics || {});
-        setLinkedProductId(existing.linkedProductId);
-        if (existing.type || existing.groupId || (existing.characteristics && Object.keys(existing.characteristics).length > 0)) {
-          setShowClarifications(true);
+      getRequestById(editRequestId).then(existing => {
+        if (existing && existing.status === 'OPEN') {
+          setEditId(editRequestId);
+          setCategory(existing.category);
+          setTitle(existing.title);
+          setQuantity(String(existing.quantity));
+          setUnit(existing.unit);
+          setBudget(String(existing.budget));
+          setDescription(existing.description);
+          setNomType(existing.type || '');
+          setGroupId(existing.groupId || '');
+          setCharValues(existing.characteristics || {});
+          setLinkedProductId(existing.linkedProductId);
+          if (existing.type || existing.groupId || (existing.characteristics && Object.keys(existing.characteristics).length > 0)) {
+            setShowClarifications(true);
+          }
+          setActiveTab('create');
         }
-        setActiveTab('create');
-        return;
-      }
+      });
+      return;
     }
 
     const productId = searchParams.get('productId');
     if (productId) {
-      const product = getProductById(productId);
-      if (product) {
-        setCategory(product.nomenclatureCategory);
-        setTitle(product.name);
-        setDescription(`Заявка на товар: ${product.name} (${product.supplierName}). ${product.description}`);
-        setUnit(product.unit);
-        setNomType(product.nomenclatureType);
-        setGroupId(product.groupId);
-        setCharValues(product.characteristics || {});
-        setLinkedProductId(product.id);
-        setShowClarifications(true);
-      }
+      getProductById(productId).then(product => {
+        if (product) {
+          setCategory(product.nomenclatureCategory);
+          setTitle(product.name);
+          setDescription(`Заявка на товар: ${product.name} (${product.supplierName}). ${product.description}`);
+          setUnit(product.unit);
+          setNomType(product.nomenclatureType);
+          setGroupId(product.groupId);
+          setCharValues(product.characteristics || {});
+          setLinkedProductId(product.id);
+          setShowClarifications(true);
+        }
+      });
     }
   }, [searchParams]);
 
@@ -102,9 +105,9 @@ function CreatePageInner() {
     setMounted(true);
     if (user) {
       if (isSupplier) {
-        setSupplierRequests(getMockRequestsForSupplier());
+        getRequestsForSupplier().then(setSupplierRequests);
       } else {
-        setMyRequests(getMockRequestsByAuthor(user.uid));
+        getRequestsByAuthor(user.uid).then(setMyRequests);
       }
     }
   }, [user, isSupplier]);
@@ -133,7 +136,7 @@ function CreatePageInner() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !quantity || !description) {
       alert('Заполните обязательные поля');
@@ -156,20 +159,21 @@ function CreatePageInner() {
     };
 
     if (editId) {
-      const updated = updateMockRequest(editId, requestData);
+      const updated = await updateRequest(editId, requestData);
       if (updated) {
-        setMyRequests(getMockRequestsByAuthor(user.uid));
+        const reqs = await getRequestsByAuthor(user.uid);
+        setMyRequests(reqs);
         setEditId(null);
         router.replace('/create');
         setActiveTab('my');
       }
     } else {
-      const newReq = createMockRequest({
+      const newReq = await createRequest({
         authorId: user.uid,
         authorName: userData?.name || 'Пользователь',
         ...requestData,
       });
-      setMyRequests([newReq, ...myRequests]);
+      if (newReq) setMyRequests([newReq, ...myRequests]);
     }
 
     setTitle('');
@@ -199,12 +203,12 @@ function CreatePageInner() {
     router.replace('/create');
   };
 
-  const handleStatusChange = (reqId: string, newStatus: RequestStatus) => {
-    updateRequestStatus(reqId, newStatus, isSupplier ? user.uid : undefined, isSupplier ? userData?.name : undefined);
+  const handleStatusChange = async (reqId: string, newStatus: RequestStatus) => {
+    await updateRequestStatus(reqId, newStatus, isSupplier ? user.uid : undefined, isSupplier ? userData?.name : undefined);
     if (isSupplier) {
-      setSupplierRequests(getMockRequestsForSupplier());
+      setSupplierRequests(await getRequestsForSupplier());
     } else {
-      setMyRequests(getMockRequestsByAuthor(user.uid));
+      setMyRequests(await getRequestsByAuthor(user.uid));
     }
   };
 

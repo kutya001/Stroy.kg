@@ -5,7 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { getSupplierDashboard, getProductsBySupplierId, subscriptionPlans, getVerificationLabel, getVerificationColor, type DashboardMetrics, type MockProduct } from '@/lib/mockDb';
+import { getSupplierDashboard, getProductsBySupplierId } from '@/lib/data';
+import { subscriptionPlans, getVerificationLabel, getVerificationColor, type DashboardMetrics, type MockProduct } from '@/lib/mockDb';
 
 export default function DashboardPage() {
   const { userData, openAuthModal } = useAuth();
@@ -16,8 +17,13 @@ export default function DashboardPage() {
   useEffect(() => {
     setMounted(true);
     if (userData?.uid) {
-      setMetrics(getSupplierDashboard(userData.uid));
-      setProducts(getProductsBySupplierId(userData.uid));
+      Promise.all([
+        getSupplierDashboard(userData.uid),
+        getProductsBySupplierId(userData.uid),
+      ]).then(([m, p]) => {
+        setMetrics(m);
+        setProducts(p);
+      });
     }
   }, [userData]);
 

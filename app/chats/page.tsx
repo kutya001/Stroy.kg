@@ -5,7 +5,8 @@ import { Search, Check, CheckCheck, MessageSquare, Shield, Send, ArrowLeft } fro
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
-import { getMockChats, getChatMessages, sendChatMessage, type MockChatMessage } from '@/lib/mockDb';
+import { getChats, getChatMessages, sendMessage } from '@/lib/data';
+import type { MockChatMessage } from '@/lib/mockDb';
 
 export default function ChatsPage() {
   const { user, canAccessChat, openAuthModal } = useAuth();
@@ -19,13 +20,13 @@ export default function ChatsPage() {
   useEffect(() => {
     setMounted(true);
     if (user) {
-      setChats(getMockChats(user.uid));
+      getChats(user.uid).then(setChats);
     }
   }, [user]);
 
   useEffect(() => {
     if (activeChatId) {
-      setMessages(getChatMessages(activeChatId));
+      getChatMessages(activeChatId).then(setMessages);
     }
   }, [activeChatId]);
 
@@ -56,11 +57,15 @@ export default function ChatsPage() {
     );
   }
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!newMsg.trim() || !activeChatId || !user) return;
-    sendChatMessage(activeChatId, user.uid, newMsg.trim());
-    setMessages(getChatMessages(activeChatId));
-    setChats(getMockChats(user.uid));
+    await sendMessage(activeChatId, user.uid, newMsg.trim());
+    const [msgs, updatedChats] = await Promise.all([
+      getChatMessages(activeChatId),
+      getChats(user.uid),
+    ]);
+    setMessages(msgs);
+    setChats(updatedChats);
     setNewMsg('');
   };
 

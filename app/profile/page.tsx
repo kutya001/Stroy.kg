@@ -2,8 +2,9 @@
 import { Settings, Bell, Shield, CircleHelp, LogOut, ChevronRight, Star, Package, MapPin, Building2, LogIn, Phone, FileText, CheckCircle2, Edit3, Mail, BadgeCheck, Crown, CreditCard, ArrowUpRight, BarChart3, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
-import { useState } from 'react';
-import { getVerificationLabel, getVerificationColor, subscriptionPlans, type VerificationLevel, VERIFICATION_CONFIG, sendEmailVerification, verifyEmail, submitInnVerification, submitLicenseVerification, getMockNotifications, markNotificationAsRead, markAllNotificationsRead, type MockNotification } from '@/lib/mockDb';
+import { useState, useEffect } from 'react';
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/lib/data';
+import { getVerificationLabel, getVerificationColor, subscriptionPlans, type VerificationLevel, VERIFICATION_CONFIG, sendEmailVerification, verifyEmail, submitInnVerification, submitLicenseVerification, type MockNotification } from '@/lib/mockDb';
 import ChangePhoneModal from '@/components/ChangePhoneModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import ProfileEditor from '@/components/ProfileEditor';
@@ -17,6 +18,7 @@ export default function ProfilePage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<MockNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   // Verification flow state
   const [verifyStep, setVerifyStep] = useState<VerifyStep>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
@@ -25,6 +27,13 @@ export default function ProfilePage() {
   const [codeInput, setCodeInput] = useState('');
   const [innInput, setInnInput] = useState('');
   const [licenseInput, setLicenseInput] = useState('');
+
+  // Load unread count on mount
+  useEffect(() => {
+    if (user) {
+      getNotifications(user.uid).then(n => setUnreadCount(n.filter(x => !x.read).length));
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -111,24 +120,30 @@ export default function ProfilePage() {
 
   const openNotifications = () => {
     if (user) {
-      setNotifications(getMockNotifications(user.uid));
-      setShowNotifications(true);
+      getNotifications(user.uid).then(n => {
+        setNotifications(n);
+        setShowNotifications(true);
+      });
     }
   };
 
-  const handleMarkRead = (id: string) => {
-    markNotificationAsRead(id);
-    if (user) setNotifications(getMockNotifications(user.uid));
-  };
-
-  const handleMarkAllRead = () => {
+  const handleMarkRead = async (id: string) => {
+    await markNotificationRead(id);
     if (user) {
-      markAllNotificationsRead(user.uid);
-      setNotifications(getMockNotifications(user.uid));
+      const n = await getNotifications(user.uid);
+      setNotifications(n);
+      setUnreadCount(n.filter(x => !x.read).length);
     }
   };
 
-  const unreadCount = user ? getMockNotifications(user.uid).filter(n => !n.read).length : 0;
+  const handleMarkAllRead = async () => {
+    if (user) {
+      await markAllNotificationsRead(user.uid);
+      const n = await getNotifications(user.uid);
+      setNotifications(n);
+      setUnreadCount(0);
+    }
+  };
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-6 pb-24 space-y-6">

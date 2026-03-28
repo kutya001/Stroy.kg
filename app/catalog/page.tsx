@@ -3,8 +3,9 @@
 import { Search, MapPin, Star, BadgeCheck, MessageSquare, Plus, Filter, ChevronDown, Package, Wrench, ShoppingCart, Megaphone, Tag, X, LayoutGrid, List, Settings2, Users, Sliders } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useMemo } from 'react';
-import { getAllMockProducts, getAllMockUsers, getProductsBySupplierId, constructionStages, nomenclatureGroups, type NomenclatureCategory, type NomenclatureType, type MockProduct, type MockUser } from '@/lib/mockDb';
+import { useState, useMemo, useEffect } from 'react';
+import { getAllProducts, getAllProfiles } from '@/lib/data';
+import { constructionStages, nomenclatureGroups, type NomenclatureCategory, type NomenclatureType, type MockProduct, type MockUser } from '@/lib/mockDb';
 import { useAuth } from '@/components/AuthProvider';
 
 type ViewMode = 'grid' | 'table';
@@ -12,10 +13,17 @@ type CatalogMode = 'products' | 'suppliers';
 type SupplierFilter = 'all' | 'products-only' | 'services-only' | 'mixed';
 
 export default function CatalogPage() {
-  const allProducts = getAllMockProducts(true);
-  const allUsers = getAllMockUsers();
+  const [allProducts, setAllProducts] = useState<MockProduct[]>([]);
+  const [allUsers, setAllUsers] = useState<MockUser[]>([]);
   const { userData, openAuthModal, canAccessChat } = useAuth();
   const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
+
+  useEffect(() => {
+    Promise.all([getAllProducts(true), getAllProfiles()]).then(([p, u]) => {
+      setAllProducts(p);
+      setAllUsers(u);
+    });
+  }, []);
 
   // View modes
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -120,14 +128,14 @@ export default function CatalogPage() {
   const suppliers = useMemo(() => {
     const sups = allUsers.filter(u => u.role === 'supplier' || u.role === 'developer');
     return sups.map(s => {
-      const prods = getProductsBySupplierId(s.uid).filter(p => p.isPublished);
+      const prods = allProducts.filter(p => p.supplierId === s.uid);
       const hasProd = prods.some(p => p.nomenclatureCategory === ('\u0422\u043e\u0432\u0430\u0440' as NomenclatureCategory));
       const hasSvc = prods.some(p => p.nomenclatureCategory === ('\u0423\u0441\u043b\u0443\u0433\u0430' as NomenclatureCategory));
       const type: 'products-only' | 'services-only' | 'mixed' = hasProd && hasSvc ? 'mixed' : hasProd ? 'products-only' : 'services-only';
       const avgRating = prods.length > 0 ? prods.reduce((s, p) => s + p.rating, 0) / prods.length : 0;
       return { ...s, products: prods, type, avgRating, productCount: prods.length };
     }).filter(s => s.productCount > 0);
-  }, [allUsers]);
+  }, [allUsers, allProducts]);
 
   const filteredSuppliers = useMemo(() => {
     let list = suppliers;

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import { getAllProfiles, updateProfile, getAllRequests, getProductsBySupplierId, getAllNomenclatureGroups as fetchNomenclatureGroups, createNomenclatureGroup as createNomGroup, updateNomenclatureGroup as updateNomGroup, deleteNomenclatureGroup as deleteNomGroup } from '@/lib/data';
 import {
-  getAllMockUsers, updateMockUser, getVerificationLabel, getVerificationColor,
+  getVerificationLabel, getVerificationColor,
   type MockUser, type VerificationLevel, type NomenclatureCategory, type NomenclatureType, type NomenclatureGroup,
   getAllNomenclatureGroups, createNomenclatureGroup, updateNomenclatureGroup, deleteNomenclatureGroup,
   getAllConstructionStages, addConstructionStage, removeConstructionStage, updateConstructionStage,
-  getAllMockRequests, getProductsBySupplierId, type RequestStatus, resetMockData,
+  getAllMockRequests, getProductsBySupplierId as getProductsBySupplierIdSync, type RequestStatus, resetMockData,
 } from '@/lib/mockDb';
 import { Loader2, ShieldAlert, BadgeCheck, Users, ArrowUp, Eye, BookOpen, BarChart3, Plus, Pencil, Trash2, X, Save, Database, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -29,14 +30,15 @@ export default function AdminPage() {
       return;
     }
 
-    const allU = getAllMockUsers();
-    setAllUsers(allU.filter(u => u.role !== 'admin'));
-    setLoading(false);
+    getAllProfiles().then(allU => {
+      setAllUsers(allU.filter(u => u.role !== 'admin'));
+      setLoading(false);
+    });
   }, [user, userData, authLoading, router]);
 
-  const handleVerificationUp = (userId: string, newLevel: VerificationLevel) => {
-    updateMockUser(userId, { verificationLevel: newLevel });
-    const allU = getAllMockUsers();
+  const handleVerificationUp = async (userId: string, newLevel: VerificationLevel) => {
+    await updateProfile(userId, { verificationLevel: newLevel });
+    const allU = await getAllProfiles();
     setAllUsers(allU.filter(u => u.role !== 'admin'));
   };
 
@@ -129,8 +131,9 @@ export default function AdminPage() {
       {activeTab === 'directories' && <DirectoriesTab />}
       {activeTab === 'analytics' && <AnalyticsTab allUsers={allUsers} />}
       {activeTab === 'demo' && <DemoTab onDataReset={() => {
-        const allU = getAllMockUsers();
-        setAllUsers(allU.filter(u => u.role !== 'admin'));
+        getAllProfiles().then(allU => {
+          setAllUsers(allU.filter(u => u.role !== 'admin'));
+        });
       }} />}
     </main>
   );
@@ -575,7 +578,7 @@ function AnalyticsTab({ allUsers }: { allUsers: MockUser[] }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {suppliers.map(supplier => {
-                const productsCount = getProductsBySupplierId(supplier.uid).length;
+                const productsCount = getProductsBySupplierIdSync(supplier.uid).length;
                 const supplierRequests = allRequests.filter(r => r.assignedSupplierId === supplier.uid);
                 return (
                   <tr key={supplier.uid} className="hover:bg-slate-50">
@@ -614,7 +617,7 @@ function AnalyticsTab({ allUsers }: { allUsers: MockUser[] }) {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {developers.map(dev => {
-                  const productsCount = getProductsBySupplierId(dev.uid).length;
+                  const productsCount = getProductsBySupplierIdSync(dev.uid).length;
                   const devRequests = allRequests.filter(r => r.assignedSupplierId === dev.uid);
                   return (
                     <tr key={dev.uid} className="hover:bg-slate-50">

@@ -4,7 +4,8 @@ import { Building2, Wrench, Camera, Save, Package, ChevronRight, Shield, ToggleL
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
-import { createMockProduct, nomenclatureGroups, constructionStages, type NomenclatureCategory, type NomenclatureType } from '@/lib/mockDb';
+import { createProduct } from '@/lib/data';
+import { nomenclatureGroups, constructionStages, type NomenclatureCategory, type NomenclatureType } from '@/lib/mockDb';
 import { useRouter } from 'next/navigation';
 
 export default function AddProductPage() {
@@ -71,7 +72,7 @@ export default function AddProductPage() {
     setCharValues({});
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !price || !description || !groupId) {
       alert('Заполните обязательные поля (наименование, группа, цена, описание)');
@@ -79,7 +80,7 @@ export default function AddProductPage() {
     }
 
     const group = nomenclatureGroups.find(g => g.id === groupId);
-    createMockProduct({
+    await createProduct({
       supplierId: user?.uid,
       supplierName: userData?.companyName || userData?.name || 'Поставщик',
       name,
