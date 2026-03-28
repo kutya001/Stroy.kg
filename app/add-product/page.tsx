@@ -24,17 +24,6 @@ export default function AddProductPage() {
   const [promotionBudget, setPromotionBudget] = useState(1);
   const [charValues, setCharValues] = useState<Record<string, string>>({});
 
-  if (!user || (userData?.role !== 'supplier' && userData?.role !== 'developer' && userData?.role !== 'admin')) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 pt-20 pb-24 text-center">
-        <Shield className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-        <h1 className="text-2xl font-bold text-secondary mb-4">Доступ запрещен</h1>
-        <p className="text-slate-600 mb-6">Только поставщики могут добавлять товары и услуги.</p>
-        <Link href="/" className="text-primary font-bold hover:underline">Вернуться на главную</Link>
-      </div>
-    );
-  }
-
   // Filtered types based on selected category
   const availableTypes = useMemo(() => {
     const types = new Set<NomenclatureType>();
@@ -52,6 +41,17 @@ export default function AddProductPage() {
   const selectedGroup = useMemo(() => {
     return nomenclatureGroups.find(g => g.id === groupId);
   }, [groupId]);
+
+  if (!user || (userData?.role !== 'supplier' && userData?.role !== 'developer' && userData?.role !== 'admin')) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 pt-20 pb-24 text-center">
+        <Shield className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+        <h1 className="text-2xl font-bold text-secondary mb-4">Доступ запрещен</h1>
+        <p className="text-slate-600 mb-6">Только поставщики могут добавлять товары и услуги.</p>
+        <Link href="/" className="text-primary font-bold hover:underline">Вернуться на главную</Link>
+      </div>
+    );
+  }
 
   const handleCategoryChange = (cat: NomenclatureCategory) => {
     setCategory(cat);

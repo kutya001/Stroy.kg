@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, MapPin, Layers, Wallet, Clock, Package, CheckCircle2, XCircle, MessageSquare, ArrowRight, Shield, User } from 'lucide-react';
 import { getRequestById, getProductById, getStatusLabel, getStatusColor, updateRequestStatus, type RequestStatus } from '@/lib/mockDb';
@@ -142,7 +143,7 @@ export default function RequestDetailPage() {
               <h3 className="font-heading font-bold text-secondary mb-4">Связанный товар</h3>
               <Link href={`/product/${linkedProduct.id}`} className="flex items-center gap-4 group hover:bg-slate-50 rounded-xl p-3 -m-3 transition-colors">
                 <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden relative shrink-0">
-                  <img src={linkedProduct.image} alt={linkedProduct.name} className="object-cover w-full h-full" />
+                  <Image src={linkedProduct.image} alt={linkedProduct.name} fill className="object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold text-secondary text-sm">{linkedProduct.name}</h4>
