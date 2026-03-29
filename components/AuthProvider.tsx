@@ -127,22 +127,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (USE_SUPABASE) {
         const supabase = createClient();
         // Пробуем войти по email+пароль
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           // Если пользователь не найден — регистрируем
           if (error.message.includes('Invalid login credentials')) {
-            const { error: signUpError } = await supabase.auth.signUp({
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
               email,
               password,
               options: { data: { role: role || 'consumer' } },
             });
             if (signUpError) throw new Error(signUpError.message);
-            // После signUp onAuthStateChange обновит состояние
+            // Если email не подтверждён — сессия не создаётся
+            if (signUpData.user && !signUpData.session) {
+              throw new Error('Аккаунт создан! Проверьте почту для подтверждения.');
+            }
+          } else if (error.message.includes('Email not confirmed')) {
+            throw new Error('Email не подтверждён. Проверьте вашу почту.');
           } else {
             throw new Error(error.message);
           }
         }
-        // onAuthStateChange обработает SIGNED_IN
+        // Если вход успешен — сразу загружаем профиль, не ждём onAuthStateChange
+        if (data?.user) {
+          const profile = await getProfile(supabase, data.user.id);
+          if (profile) {
+            setUser(profile);
+            setUserData(profile);
+            if (!profile.onboardingCompleted) {
+              setIsOnboardingModalOpen(true);
+            }
+          }
+        }
         setIsAuthModalOpen(false);
       } else {
         // Mock-режим: ищем по email

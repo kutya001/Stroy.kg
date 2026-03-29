@@ -34,20 +34,21 @@ DECLARE
 BEGIN
 
 -- Вставляем пользователей в auth.users (если ещё нет)
-INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, role, aud, created_at, updated_at, confirmation_token)
+-- ВАЖНО: GoTrue требует чтобы строковые поля НЕ были NULL (email_change, recovery_token и т.д.)
+INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, role, aud, created_at, updated_at, confirmation_token, email_change, email_change_token_new, email_change_token_current, email_change_confirm_status, recovery_token, reauthentication_token, phone_change, phone_change_token)
 VALUES
-  (uid_admin,  '00000000-0000-0000-0000-000000000000', 'admin@stroy.kg',      crypt('admin123', gen_salt('bf')),  NOW(), '{"role":"admin"}'::jsonb,    'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_sup1,   '00000000-0000-0000-0000-000000000000', 'stroymaster@mail.kg', crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_sup2,   '00000000-0000-0000-0000-000000000000', 'severles@mail.kg',    crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_con1,   '00000000-0000-0000-0000-000000000000', 'ivan@mail.kg',        crypt('123456', gen_salt('bf')),   NOW(), '{"role":"consumer"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_dev1,   '00000000-0000-0000-0000-000000000000', 'smailov@mail.kg',     crypt('123456', gen_salt('bf')),   NOW(), '{"role":"developer"}'::jsonb,'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_sup_t1, '00000000-0000-0000-0000-000000000000', 'sup1@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_sup_t2, '00000000-0000-0000-0000-000000000000', 'sup2@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_sup_t3, '00000000-0000-0000-0000-000000000000', 'sup3@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_con_t1, '00000000-0000-0000-0000-000000000000', 'con1@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"consumer"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_con_t2, '00000000-0000-0000-0000-000000000000', 'con2@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"consumer"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_con_t3, '00000000-0000-0000-0000-000000000000', 'con3@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"consumer"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), ''),
-  (uid_dev_t1, '00000000-0000-0000-0000-000000000000', 'dev1@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"developer"}'::jsonb,'authenticated', 'authenticated', NOW(), NOW(), '')
+  (uid_admin,  '00000000-0000-0000-0000-000000000000', 'admin@stroy.kg',      crypt('admin123', gen_salt('bf')),  NOW(), '{"role":"admin"}'::jsonb,    'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_sup1,   '00000000-0000-0000-0000-000000000000', 'stroymaster@mail.kg', crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_sup2,   '00000000-0000-0000-0000-000000000000', 'severles@mail.kg',    crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_con1,   '00000000-0000-0000-0000-000000000000', 'ivan@mail.kg',        crypt('123456', gen_salt('bf')),   NOW(), '{"role":"consumer"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_dev1,   '00000000-0000-0000-0000-000000000000', 'smailov@mail.kg',     crypt('123456', gen_salt('bf')),   NOW(), '{"role":"developer"}'::jsonb,'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_sup_t1, '00000000-0000-0000-0000-000000000000', 'sup1@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_sup_t2, '00000000-0000-0000-0000-000000000000', 'sup2@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_sup_t3, '00000000-0000-0000-0000-000000000000', 'sup3@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"supplier"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_con_t1, '00000000-0000-0000-0000-000000000000', 'con1@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"consumer"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_con_t2, '00000000-0000-0000-0000-000000000000', 'con2@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"consumer"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_con_t3, '00000000-0000-0000-0000-000000000000', 'con3@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"consumer"}'::jsonb, 'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', ''),
+  (uid_dev_t1, '00000000-0000-0000-0000-000000000000', 'dev1@stroy.kg',       crypt('123456', gen_salt('bf')),   NOW(), '{"role":"developer"}'::jsonb,'authenticated', 'authenticated', NOW(), NOW(), '', '', '', '', 0, '', '', '', '')
 ON CONFLICT (id) DO NOTHING;
 
 -- Добавляем identities (требуется для Supabase auth)
