@@ -1472,3 +1472,79 @@ export async function submitLicenseVerification(uid: string, license: string): P
   // TODO: Replace with real license verification
   throw new Error('Real license verification not configured');
 }
+
+// ==========================================
+// PASSWORD AUTHENTICATION
+// ==========================================
+
+export function authenticateWithPassword(identifier: string, password: string): MockUser | null {
+  const user = users.find(
+    u => (u.phone === identifier || u.email === identifier) && u.password === password
+  );
+  return user ?? null;
+}
+
+// ==========================================
+// NOMENCLATURE GROUP CRUD
+// ==========================================
+
+export function getAllNomenclatureGroups(): NomenclatureGroup[] {
+  return nomenclatureGroups;
+}
+
+export function createNomenclatureGroup(group: Omit<NomenclatureGroup, 'id'>): NomenclatureGroup {
+  const newGroup: NomenclatureGroup = { ...group, id: `grp-${Date.now()}` };
+  nomenclatureGroups.push(newGroup);
+  return newGroup;
+}
+
+export function updateNomenclatureGroup(id: string, updates: Partial<NomenclatureGroup>): NomenclatureGroup | null {
+  const idx = nomenclatureGroups.findIndex(g => g.id === id);
+  if (idx === -1) return null;
+  Object.assign(nomenclatureGroups[idx], updates);
+  return nomenclatureGroups[idx];
+}
+
+export function deleteNomenclatureGroup(id: string): boolean {
+  const idx = nomenclatureGroups.findIndex(g => g.id === id);
+  if (idx === -1) return false;
+  nomenclatureGroups.splice(idx, 1);
+  return true;
+}
+
+// ==========================================
+// CONSTRUCTION STAGES CRUD
+// ==========================================
+
+export function getAllConstructionStages(): string[] {
+  return constructionStages;
+}
+
+export function addConstructionStage(stage: string): string[] {
+  if (!constructionStages.includes(stage)) {
+    constructionStages.push(stage);
+  }
+  return constructionStages;
+}
+
+export function removeConstructionStage(stage: string): string[] {
+  constructionStages = constructionStages.filter(s => s !== stage);
+  return constructionStages;
+}
+
+export function updateConstructionStage(oldName: string, newName: string): string[] {
+  const idx = constructionStages.indexOf(oldName);
+  if (idx !== -1) {
+    constructionStages[idx] = newName;
+  }
+  return constructionStages;
+}
+
+// ==========================================
+// RESET MOCK DATA
+// ==========================================
+
+export function resetMockData(): void {
+  // Reset is a no-op in mock mode since data is module-scoped
+  // In a real app this would clear the database
+}
