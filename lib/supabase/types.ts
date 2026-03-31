@@ -37,6 +37,8 @@ export type Database = {
           revenue: number
           daily_ad_budget: number
           is_promoted: boolean
+          auth_preference: 'password' | 'otp' | 'both' | null
+          password: string | null
         }
         Insert: {
           id: string
@@ -61,6 +63,8 @@ export type Database = {
           revenue?: number
           daily_ad_budget?: number
           is_promoted?: boolean
+          auth_preference?: 'password' | 'otp' | 'both' | null
+          password?: string | null
         }
         Update: {
           id?: string
@@ -84,6 +88,8 @@ export type Database = {
           revenue?: number
           daily_ad_budget?: number
           is_promoted?: boolean
+          auth_preference?: 'password' | 'otp' | 'both' | null
+          password?: string | null
         }
         Relationships: []
       }

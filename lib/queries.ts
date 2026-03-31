@@ -48,6 +48,8 @@ function mapProfile(row: ProfileRow): MockUser {
     revenue: row.revenue,
     dailyAdBudget: row.daily_ad_budget,
     isPromoted: row.is_promoted,
+    authPreference: row.auth_preference ?? undefined,
+    password: row.password ?? undefined,
   }
 }
 
@@ -158,6 +160,8 @@ export async function updateProfile(supabase: Client, uid: string, updates: Part
   if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as ProfileUpdate['subscription']
   if (updates.dailyAdBudget !== undefined) dbUpdates.daily_ad_budget = updates.dailyAdBudget
   if (updates.isPromoted !== undefined) dbUpdates.is_promoted = updates.isPromoted
+  if (updates.authPreference !== undefined) dbUpdates.auth_preference = updates.authPreference as ProfileUpdate['auth_preference']
+  if (updates.password !== undefined) dbUpdates.password = updates.password
 
   const { data } = await supabase.from('profiles').update(dbUpdates).eq('id', uid).select().single()
   return data ? mapProfile(data) : null
