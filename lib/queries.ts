@@ -170,6 +170,7 @@ export async function updateProfile(supabase: Client, uid: string, updates: Part
   return data ? mapProfile(data as ProfileRow) : null
 }
 
+
 // ============================================
 // PRODUCTS
 // ============================================
@@ -194,7 +195,7 @@ export async function getProductsBySupplierId(supabase: Client, supplierId: stri
 }
 
 export async function createProduct(supabase: Client, product: Partial<MockProduct>): Promise<MockProduct | null> {
-  const { data } = await supabase.from('products').insert({
+  const { data, error } = await supabase.from('products').insert({
     supplier_id: product.supplierId!,
     supplier_name: product.supplierName ?? '',
     name: product.name ?? '',
@@ -214,6 +215,7 @@ export async function createProduct(supabase: Client, product: Partial<MockProdu
     promotion_budget: product.promotionBudget,
     construction_stage: product.constructionStage,
   }).select().single()
+  if (error) console.error('[Supabase] createProduct error:', error.message, error.code)
   return data ? mapProduct(data) : null
 }
 
@@ -259,7 +261,7 @@ export async function getRequestById(supabase: Client, id: string): Promise<Mock
 }
 
 export async function createRequest(supabase: Client, req: Partial<MockRequest>): Promise<MockRequest | null> {
-  const { data } = await supabase.from('requests').insert({
+  const { data, error } = await supabase.from('requests').insert({
     author_id: req.authorId!,
     author_name: req.authorName ?? '',
     title: req.title ?? '',
@@ -275,6 +277,7 @@ export async function createRequest(supabase: Client, req: Partial<MockRequest>)
     unit: req.unit ?? 'шт',
     region: req.region ?? 'Бишкек',
   }).select().single()
+  if (error) console.error('[Supabase] createRequest error:', error.message, error.code)
   return data ? mapRequest(data) : null
 }
 

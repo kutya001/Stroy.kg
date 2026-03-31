@@ -11,6 +11,7 @@ import {
   type UserRole,
 } from '@/lib/mockDb';
 import { getProfileByPhone } from '@/lib/data';
+import { createClient } from '@/lib/supabase/client';
 import AuthModal from './AuthModal';
 import OnboardingModal from './OnboardingModal';
 
@@ -59,28 +60,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [adminViewAs, setAdminViewAs] = useState<UserRole | null>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('mockUser');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setUserData(parsedUser);
-        // Re-resolve data-layer UID in case it was stored with a stale ID
-        resolveDataLayerUser(parsedUser).then(resolved => {
+    const init = async () => {
+      // 1. Restore mock user from localStorage
+      const storedUser = localStorage.getItem('mockUser');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+          setUserData(parsedUser);
+          // Re-resolve data-layer UID in case it was stored with a stale ID
+          const resolved = await resolveDataLayerUser(parsedUser);
           if (resolved.uid !== parsedUser.uid) {
             setUser(resolved);
             setUserData(resolved);
             localStorage.setItem('mockUser', JSON.stringify(resolved));
           }
-        });
-        if (!parsedUser.onboardingCompleted) {
-          setIsOnboardingModalOpen(true);
+          if (!parsedUser.onboardingCompleted) {
+            setIsOnboardingModalOpen(true);
+          }
+
+          // 2. Ensure Supabase Auth session exists
+          await ensureSupabaseSession(resolved.email);
+        } catch {
+          localStorage.removeItem('mockUser');
         }
-      } catch {
-        localStorage.removeItem('mockUser');
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+    init();
   }, []);
 
   const isAdminMode = user?.role === 'admin';
@@ -103,6 +110,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return mockUser;
   };
 
+  // Ensure a real Supabase Auth session exists (for RLS policies)
+  // Checks if there's an active session; if not, tries to sign in with known email
+  const ensureSupabaseSession = async (email?: string, password?: string) => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) return; // already authenticated
+
+      if (!email) return;
+      // Try to sign in — for seed/demo users the password is either provided or '123456'
+      const passwords = password ? [password] : ['123456', 'admin123'];
+      for (const pw of passwords) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+        if (!error) return;
+      }
+    } catch { /* silent — mock auth still works */ }
+  };
+
   const loginWithPhone = async (phone: string, role: UserRole = 'consumer') => {
     setLoading(true);
     try {
@@ -114,6 +139,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(resolved);
       setUserData(resolved);
       localStorage.setItem('mockUser', JSON.stringify(resolved));
+
+      // Establish Supabase Auth session
+      await ensureSupabaseSession(resolved.email);
+
       if (!resolved.onboardingCompleted) {
         setIsOnboardingModalOpen(true);
       }
@@ -134,6 +163,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(resolved);
       setUserData(resolved);
       localStorage.setItem('mockUser', JSON.stringify(resolved));
+
+      // Establish Supabase Auth session
+      await ensureSupabaseSession(email);
+
       setIsAuthModalOpen(false);
     } finally {
       setLoading(false);
@@ -151,6 +184,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(resolved);
       setUserData(resolved);
       localStorage.setItem('mockUser', JSON.stringify(resolved));
+
+      // Establish Supabase Auth session with exact credentials
+      const email = resolved.email || identifier;
+      await ensureSupabaseSession(email, password);
+
       setIsAuthModalOpen(false);
     } finally {
       setLoading(false);
@@ -162,6 +200,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserData(null);
     setAdminViewAs(null);
     localStorage.removeItem('mockUser');
+    // Sign out from Supabase Auth as well
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch { /* silent */ }
   };
 
   const updateProfile = async (data: Partial<MockUser>) => {
