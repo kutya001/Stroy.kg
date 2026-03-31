@@ -5,12 +5,12 @@ import { useAuth } from '@/components/AuthProvider';
 import { getAllProfiles, updateProfile, getAllRequests, getProductsBySupplierId, getAllNomenclatureGroups as fetchNomenclatureGroups, createNomenclatureGroup as createNomGroup, updateNomenclatureGroup as updateNomGroup, deleteNomenclatureGroup as deleteNomGroup } from '@/lib/data';
 import {
   getVerificationLabel, getVerificationColor,
-  type MockUser, type VerificationLevel, type NomenclatureCategory, type NomenclatureType, type NomenclatureGroup,
+  type MockUser, type MockProduct, type UserRole, type SubscriptionTier, type VerificationLevel, type NomenclatureCategory, type NomenclatureType, type NomenclatureGroup,
   getAllNomenclatureGroups, createNomenclatureGroup, updateNomenclatureGroup, deleteNomenclatureGroup,
   getAllConstructionStages, addConstructionStage, removeConstructionStage, updateConstructionStage,
   getAllMockRequests, getProductsBySupplierId as getProductsBySupplierIdSync, type RequestStatus, resetMockData,
 } from '@/lib/mockDb';
-import { Loader2, ShieldAlert, BadgeCheck, Users, ArrowUp, Eye, BookOpen, BarChart3, Plus, Pencil, Trash2, X, Save, Database, RefreshCw } from 'lucide-react';
+import { Loader2, ShieldAlert, BadgeCheck, Users, ArrowUp, Eye, BookOpen, BarChart3, Plus, Pencil, Trash2, X, Save, Database, RefreshCw, Search, ChevronLeft, Lock, Mail, Phone, Building2, MapPin, Star, Package, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 type AdminTab = 'users' | 'directories' | 'analytics' | 'demo';
@@ -22,6 +22,11 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const router = useRouter();
 
+  const loadUsers = async () => {
+    const allU = await getAllProfiles();
+    setAllUsers(allU.filter(u => u.role !== 'admin'));
+  };
+
   useEffect(() => {
     if (authLoading) return;
     
@@ -30,16 +35,12 @@ export default function AdminPage() {
       return;
     }
 
-    getAllProfiles().then(allU => {
-      setAllUsers(allU.filter(u => u.role !== 'admin'));
-      setLoading(false);
-    });
+    loadUsers().then(() => setLoading(false));
   }, [user, userData, authLoading, router]);
 
   const handleVerificationUp = async (userId: string, newLevel: VerificationLevel) => {
     await updateProfile(userId, { verificationLevel: newLevel });
-    const allU = await getAllProfiles();
-    setAllUsers(allU.filter(u => u.role !== 'admin'));
+    await loadUsers();
   };
 
   if (authLoading || loading) {
@@ -127,27 +128,476 @@ export default function AdminPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'users' && <UsersTab allUsers={allUsers} pendingUsers={pendingUsers} verifiedUsers={verifiedUsers} onVerificationUp={handleVerificationUp} />}
+      {activeTab === 'users' && <UsersTab allUsers={allUsers} pendingUsers={pendingUsers} verifiedUsers={verifiedUsers} onVerificationUp={handleVerificationUp} onUsersChanged={loadUsers} />}
       {activeTab === 'directories' && <DirectoriesTab />}
       {activeTab === 'analytics' && <AnalyticsTab allUsers={allUsers} />}
-      {activeTab === 'demo' && <DemoTab onDataReset={() => {
-        getAllProfiles().then(allU => {
-          setAllUsers(allU.filter(u => u.role !== 'admin'));
-        });
-      }} />}
+      {activeTab === 'demo' && <DemoTab onDataReset={loadUsers} />}
     </main>
   );
 }
 
+
 // ==========================================
 // USERS TAB
 // ==========================================
-function UsersTab({ allUsers, pendingUsers, verifiedUsers, onVerificationUp }: {
+function UsersTab({ allUsers, pendingUsers, verifiedUsers, onVerificationUp, onUsersChanged }: {
   allUsers: MockUser[];
   pendingUsers: MockUser[];
   verifiedUsers: MockUser[];
   onVerificationUp: (userId: string, level: VerificationLevel) => void;
+  onUsersChanged: () => void;
 }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const [selectedUser, setSelectedUser] = useState<MockUser | null>(null);
+  const [editingUser, setEditingUser] = useState<MockUser | null>(null);
+  const [supplierProducts, setSupplierProducts] = useState<MockProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // Password reset
+  const [resetPasswordUid, setResetPasswordUid] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // Edit form
+  const [editForm, setEditForm] = useState({
+    name: '', phone: '', email: '', role: '' as UserRole,
+    companyName: '', inn: '', subscription: '' as SubscriptionTier,
+    verificationLevel: 0 as VerificationLevel,
+    phoneVerified: false, emailVerified: false,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const filteredUsers = allUsers.filter(u => {
+    if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return u.name.toLowerCase().includes(q) ||
+        u.phone.includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.companyName || '').toLowerCase().includes(q) ||
+        (u.inn || '').includes(q);
+    }
+    return true;
+  });
+
+  const openUserDetail = async (u: MockUser) => {
+    setSelectedUser(u);
+    setEditingUser(null);
+    setResetPasswordUid(null);
+    if (u.role === 'supplier' || u.role === 'developer') {
+      setLoadingProducts(true);
+      const prods = await getProductsBySupplierId(u.uid);
+      setSupplierProducts(prods);
+      setLoadingProducts(false);
+    } else {
+      setSupplierProducts([]);
+    }
+  };
+
+  const startEdit = (u: MockUser) => {
+    setEditingUser(u);
+    setEditForm({
+      name: u.name,
+      phone: u.phone,
+      email: u.email || '',
+      role: u.role,
+      companyName: u.companyName || '',
+      inn: u.inn || '',
+      subscription: u.subscription,
+      verificationLevel: u.verificationLevel,
+      phoneVerified: u.phoneVerified,
+      emailVerified: u.emailVerified,
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingUser) return;
+    setSaving(true);
+    await updateProfile(editingUser.uid, {
+      name: editForm.name,
+      phone: editForm.phone,
+      email: editForm.email || undefined,
+      role: editForm.role,
+      companyName: editForm.companyName || undefined,
+      inn: editForm.inn || undefined,
+      subscription: editForm.subscription,
+      verificationLevel: editForm.verificationLevel,
+      phoneVerified: editForm.phoneVerified,
+      emailVerified: editForm.emailVerified,
+    });
+    setSaving(false);
+    setEditingUser(null);
+    onUsersChanged();
+    // Re-fetch selected user
+    const allU = await getAllProfiles();
+    const updated = allU.find(u => u.uid === editingUser.uid);
+    if (updated) setSelectedUser(updated);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!resetPasswordUid) return;
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (newPassword.length < 6) {
+      setPasswordError('Пароль должен содержать минимум 6 символов');
+      return;
+    }
+    if (newPassword !== passwordConfirm) {
+      setPasswordError('Пароли не совпадают');
+      return;
+    }
+
+    setSavingPassword(true);
+    await updateProfile(resetPasswordUid, { password: newPassword });
+    setSavingPassword(false);
+    setPasswordSuccess(true);
+    setNewPassword('');
+    setPasswordConfirm('');
+    onUsersChanged();
+    setTimeout(() => {
+      setPasswordSuccess(false);
+      setResetPasswordUid(null);
+    }, 2000);
+  };
+
+  const roleLabel = (role: UserRole) => {
+    const labels: Record<UserRole, string> = { consumer: 'Покупатель', supplier: 'Поставщик', developer: 'Застройщик', admin: 'Админ' };
+    return labels[role];
+  };
+
+  const roleColor = (role: UserRole) => {
+    const colors: Record<UserRole, string> = {
+      consumer: 'bg-blue-100 text-blue-700',
+      supplier: 'bg-orange-100 text-orange-700',
+      developer: 'bg-purple-100 text-purple-700',
+      admin: 'bg-red-100 text-red-700',
+    };
+    return colors[role];
+  };
+
+  // If a user is selected, show their detail page
+  if (selectedUser) {
+    return (
+      <div>
+        {/* Back button */}
+        <button onClick={() => { setSelectedUser(null); setEditingUser(null); setResetPasswordUid(null); }} className="flex items-center gap-2 text-primary font-bold text-sm mb-6 hover:underline">
+          <ChevronLeft className="w-4 h-4" /> Назад к списку
+        </button>
+
+        {/* User Header Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold shrink-0 ${
+                selectedUser.role === 'supplier' || selectedUser.role === 'developer' ? 'bg-primary/10 text-primary' : 'bg-blue-50 text-blue-600'
+              }`}>
+                {selectedUser.name ? selectedUser.name.charAt(0).toUpperCase() : '?'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-2xl font-heading font-bold text-secondary">{selectedUser.name || 'Без имени'}</h2>
+                  {selectedUser.verificationLevel >= 2 && <BadgeCheck className="w-5 h-5 text-green-500" />}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${roleColor(selectedUser.role)}`}>{roleLabel(selectedUser.role)}</span>
+                  <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getVerificationColor(selectedUser.verificationLevel)}`}>{getVerificationLabel(selectedUser.verificationLevel)}</span>
+                  <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-slate-100 text-slate-600">{selectedUser.subscription}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button onClick={() => startEdit(selectedUser)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors">
+                <Pencil className="w-4 h-4" /> Редактировать
+              </button>
+              <button onClick={() => { setResetPasswordUid(selectedUser.uid); setNewPassword(''); setPasswordConfirm(''); setPasswordError(''); setPasswordSuccess(false); }} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors">
+                <Lock className="w-4 h-4" /> Сбросить пароль
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Password Reset Section */}
+        {resetPasswordUid && (
+          <div className="bg-white rounded-2xl shadow-sm border border-amber-200 p-6 mb-6">
+            <h3 className="font-bold text-secondary flex items-center gap-2 mb-4">
+              <Lock className="w-5 h-5 text-amber-500" /> Сброс пароля для {selectedUser.name}
+            </h3>
+            {passwordSuccess ? (
+              <p className="text-green-600 font-medium">Пароль успешно изменён!</p>
+            ) : (
+              <div className="space-y-3 max-w-md">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Новый пароль</label>
+                  <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Минимум 6 символов" className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Подтверждение пароля</label>
+                  <input type="password" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} placeholder="Повторите пароль" className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
+                </div>
+                {passwordError && <p className="text-red-500 text-sm font-medium">{passwordError}</p>}
+                <div className="flex gap-2">
+                  <button onClick={handlePasswordReset} disabled={savingPassword} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    {savingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Установить пароль
+                  </button>
+                  <button onClick={() => setResetPasswordUid(null)} className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors">Отмена</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Edit Form */}
+        {editingUser && (
+          <div className="bg-white rounded-2xl shadow-sm border border-primary/30 p-6 mb-6">
+            <h3 className="font-bold text-secondary flex items-center gap-2 mb-4">
+              <Pencil className="w-5 h-5 text-primary" /> Редактирование профиля
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Имя</label>
+                <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Телефон</label>
+                <input type="text" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Роль</label>
+                <select value={editForm.role} onChange={e => setEditForm({...editForm, role: e.target.value as UserRole})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm">
+                  <option value="consumer">Покупатель</option>
+                  <option value="supplier">Поставщик</option>
+                  <option value="developer">Застройщик</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Компания</label>
+                <input type="text" value={editForm.companyName} onChange={e => setEditForm({...editForm, companyName: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">ИНН</label>
+                <input type="text" value={editForm.inn} onChange={e => setEditForm({...editForm, inn: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Подписка</label>
+                <select value={editForm.subscription} onChange={e => setEditForm({...editForm, subscription: e.target.value as SubscriptionTier})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm">
+                  <option value="FREE">FREE</option>
+                  <option value="BASIC">BASIC</option>
+                  <option value="PRO">PRO</option>
+                  <option value="ENTERPRISE">ENTERPRISE</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Уровень верификации</label>
+                <select value={editForm.verificationLevel} onChange={e => setEditForm({...editForm, verificationLevel: Number(e.target.value) as VerificationLevel})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 text-sm">
+                  <option value={0}>0 — Не подтверждён</option>
+                  <option value={1}>1 — Телефон + почта</option>
+                  <option value={2}>2 — ИНН / паспорт</option>
+                  <option value={3}>3 — Лицензии</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2 flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={editForm.phoneVerified} onChange={e => setEditForm({...editForm, phoneVerified: e.target.checked})} className="rounded accent-primary" />
+                  Телефон подтверждён
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={editForm.emailVerified} onChange={e => setEditForm({...editForm, emailVerified: e.target.checked})} className="rounded accent-primary" />
+                  Email подтверждён
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={handleSaveEdit} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Сохранить
+              </button>
+              <button onClick={() => setEditingUser(null)} className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors">Отмена</button>
+            </div>
+          </div>
+        )}
+
+        {/* User Info */}
+        {!editingUser && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Contact Info */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+              <h3 className="font-bold text-secondary mb-4">Контактная информация</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Phone className="w-4 h-4 text-slate-400" />
+                  <div>
+                    <div className="text-sm font-medium text-secondary">{selectedUser.phone}</div>
+                    <div className="text-xs text-slate-400">{selectedUser.phoneVerified ? '✓ Подтверждён' : '✗ Не подтверждён'}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Mail className="w-4 h-4 text-slate-400" />
+                  <div>
+                    <div className="text-sm font-medium text-secondary">{selectedUser.email || '—'}</div>
+                    <div className="text-xs text-slate-400">{selectedUser.emailVerified ? '✓ Подтверждён' : '✗ Не подтверждён'}</div>
+                  </div>
+                </div>
+                {selectedUser.companyName && (
+                  <div className="flex items-center gap-3">
+                    <Building2 className="w-4 h-4 text-slate-400" />
+                    <div className="text-sm font-medium text-secondary">{selectedUser.companyName}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Account Info */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+              <h3 className="font-bold text-secondary mb-4">Данные аккаунта</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">UID</span>
+                  <span className="font-mono text-xs text-secondary bg-slate-50 px-2 py-0.5 rounded">{selectedUser.uid}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Роль</span>
+                  <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${roleColor(selectedUser.role)}`}>{roleLabel(selectedUser.role)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Подписка</span>
+                  <span className="font-bold text-secondary">{selectedUser.subscription}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Верификация</span>
+                  <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getVerificationColor(selectedUser.verificationLevel)}`}>{getVerificationLabel(selectedUser.verificationLevel)}</span>
+                </div>
+                {selectedUser.inn && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">ИНН</span>
+                    <span className="font-medium text-secondary">{selectedUser.inn}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Onboarding</span>
+                  <span className={`font-medium ${selectedUser.onboardingCompleted ? 'text-green-600' : 'text-amber-500'}`}>{selectedUser.onboardingCompleted ? 'Завершён' : 'Не завершён'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Зарегистрирован</span>
+                  <span className="text-secondary">{new Date(selectedUser.createdAt).toLocaleDateString('ru-RU')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Supplier-specific data */}
+        {(selectedUser.role === 'supplier' || selectedUser.role === 'developer') && !editingUser && (
+          <>
+            {/* Supplier Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+                <div className="text-xl font-bold text-secondary">{selectedUser.pageViews ?? 0}</div>
+                <div className="text-[10px] text-slate-500 uppercase font-bold">Просмотров</div>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+                <div className="text-xl font-bold text-secondary">{selectedUser.chatRequests ?? 0}</div>
+                <div className="text-[10px] text-slate-500 uppercase font-bold">Чат-запросов</div>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+                <div className="text-xl font-bold text-secondary">{selectedUser.completedOrders ?? 0}</div>
+                <div className="text-[10px] text-slate-500 uppercase font-bold">Заказов</div>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+                <div className="text-xl font-bold text-primary">{(selectedUser.revenue ?? 0).toLocaleString()}</div>
+                <div className="text-[10px] text-slate-500 uppercase font-bold">Выручка (KGS)</div>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+                <div className="text-xl font-bold text-secondary">{selectedUser.dailyAdBudget ?? 0}</div>
+                <div className="text-[10px] text-slate-500 uppercase font-bold">Бюджет / день</div>
+              </div>
+            </div>
+
+            {/* Supplier Licenses */}
+            {(selectedUser.licenses?.length || selectedUser.certificates?.length) ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+                <h3 className="font-bold text-secondary mb-3">Лицензии и сертификаты</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedUser.licenses?.map((l, i) => (
+                    <span key={`lic-${i}`} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg flex items-center gap-1">
+                      <Shield className="w-3 h-3" /> {l}
+                    </span>
+                  ))}
+                  {selectedUser.certificates?.map((c, i) => (
+                    <span key={`cert-${i}`} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg">{c}</span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Supplier Products */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
+                <h3 className="text-lg font-bold text-secondary flex items-center gap-2">
+                  <Package className="w-5 h-5 text-primary" /> Товары и услуги поставщика
+                  <span className="ml-2 text-sm font-normal text-slate-500">({supplierProducts.length})</span>
+                </h3>
+              </div>
+              {loadingProducts ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : supplierProducts.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-sm">Нет товаров или услуг</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <tr>
+                        <th className="px-6 py-3">Название</th>
+                        <th className="px-6 py-3">Категория</th>
+                        <th className="px-6 py-3 text-right">Цена</th>
+                        <th className="px-6 py-3 text-center">Рейтинг</th>
+                        <th className="px-6 py-3 text-center">Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {supplierProducts.map(p => (
+                        <tr key={p.id} className="hover:bg-slate-50">
+                          <td className="px-6 py-3">
+                            <div className="font-medium text-secondary">{p.name}</div>
+                            <div className="text-xs text-slate-400">{p.groupName}</div>
+                          </td>
+                          <td className="px-6 py-3">
+                            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${p.nomenclatureCategory === 'Товар' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{p.nomenclatureCategory}</span>
+                            <span className="text-xs text-slate-400 ml-1">→ {p.nomenclatureType}</span>
+                          </td>
+                          <td className="px-6 py-3 text-right font-bold text-primary whitespace-nowrap">{p.price.toLocaleString()} / {p.unit}</td>
+                          <td className="px-6 py-3 text-center">
+                            <span className="inline-flex items-center gap-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" /> {p.rating}</span>
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {p.isPublished ? <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded">Опубл.</span> : <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded">Черновик</span>}
+                              {p.isPromoted && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded">РЕК</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Main users list view
   return (
     <>
       {/* Stats */}
@@ -173,22 +623,20 @@ function UsersTab({ allUsers, pendingUsers, verifiedUsers, onVerificationUp }: {
       </div>
 
       {/* Pending Verification */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-xl font-semibold text-secondary">Заявки на верификацию</h2>
-          <p className="text-slate-500 text-sm mt-1">Пользователи, ожидающие повышения уровня</p>
-        </div>
-        {pendingUsers.length === 0 ? (
-          <div className="p-8 text-center text-slate-500">Нет новых заявок на верификацию</div>
-        ) : (
+      {pendingUsers.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8">
+          <div className="p-6 border-b border-slate-100">
+            <h2 className="text-xl font-semibold text-secondary">Заявки на верификацию</h2>
+            <p className="text-slate-500 text-sm mt-1">Пользователи, ожидающие повышения уровня</p>
+          </div>
           <div className="divide-y divide-slate-100">
             {pendingUsers.map((u) => (
               <div key={u.uid} className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
+                <div className="cursor-pointer" onClick={() => openUserDetail(u)}>
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-lg">{u.name}</h3>
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold uppercase rounded-full">
-                      {u.role === 'supplier' ? 'Поставщик' : u.role === 'developer' ? 'Застройщик' : 'Покупатель'}
+                    <h3 className="font-bold text-lg hover:text-primary transition-colors">{u.name}</h3>
+                    <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-full ${roleColor(u.role)}`}>
+                      {roleLabel(u.role)}
                     </span>
                     <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getVerificationColor(u.verificationLevel)}`}>
                       {getVerificationLabel(u.verificationLevel)}
@@ -221,13 +669,35 @@ function UsersTab({ allUsers, pendingUsers, verifiedUsers, onVerificationUp }: {
               </div>
             ))}
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Search & Filter */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Поиск по имени, телефону, email, ИНН, компании..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full h-11 pl-11 pr-4 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 outline-none"
+          />
+        </div>
+        <div className="flex gap-2">
+          {(['all', 'consumer', 'supplier', 'developer'] as const).map(role => (
+            <button key={role} onClick={() => setRoleFilter(role)} className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${roleFilter === role ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              {role === 'all' ? 'Все' : roleLabel(role)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* All Users Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-secondary">Все пользователи</h2>
+          <span className="text-sm text-slate-500">{filteredUsers.length} из {allUsers.length}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -235,21 +705,35 @@ function UsersTab({ allUsers, pendingUsers, verifiedUsers, onVerificationUp }: {
               <tr>
                 <th className="px-6 py-3">Имя</th>
                 <th className="px-6 py-3">Роль</th>
-                <th className="px-6 py-3">Телефон</th>
+                <th className="px-6 py-3">Телефон / Email</th>
+                <th className="px-6 py-3">Компания</th>
                 <th className="px-6 py-3">Верификация</th>
                 <th className="px-6 py-3">Подписка</th>
+                <th className="px-6 py-3 text-right">Действия</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {allUsers.map(u => (
-                <tr key={u.uid} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 font-medium text-secondary">{u.name}</td>
-                  <td className="px-6 py-4 text-slate-500">{u.role}</td>
-                  <td className="px-6 py-4 text-slate-500">{u.phone}</td>
+              {filteredUsers.map(u => (
+                <tr key={u.uid} className="hover:bg-slate-50 cursor-pointer" onClick={() => openUserDetail(u)}>
+                  <td className="px-6 py-4 font-medium text-secondary">{u.name || '—'}</td>
+                  <td className="px-6 py-4"><span className={`px-2 py-0.5 text-xs font-bold rounded-full ${roleColor(u.role)}`}>{roleLabel(u.role)}</span></td>
+                  <td className="px-6 py-4">
+                    <div className="text-slate-600">{u.phone}</div>
+                    {u.email && <div className="text-xs text-slate-400">{u.email}</div>}
+                  </td>
+                  <td className="px-6 py-4 text-slate-500">{u.companyName || '—'}</td>
                   <td className="px-6 py-4"><span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getVerificationColor(u.verificationLevel)}`}>{getVerificationLabel(u.verificationLevel)}</span></td>
                   <td className="px-6 py-4 text-slate-500">{u.subscription}</td>
+                  <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => openUserDetail(u)} className="p-1.5 text-slate-400 hover:text-primary transition-colors" title="Открыть"><Eye className="w-4 h-4" /></button>
+                    <button onClick={() => { openUserDetail(u).then(() => startEdit(u)); }} className="p-1.5 text-slate-400 hover:text-primary transition-colors ml-1" title="Редактировать"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => { openUserDetail(u); setResetPasswordUid(u.uid); setNewPassword(''); setPasswordConfirm(''); setPasswordError(''); setPasswordSuccess(false); }} className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors ml-1" title="Сбросить пароль"><Lock className="w-4 h-4" /></button>
+                  </td>
                 </tr>
               ))}
+              {filteredUsers.length === 0 && (
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">Пользователи не найдены</td></tr>
+              )}
             </tbody>
           </table>
         </div>
