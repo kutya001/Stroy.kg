@@ -59,9 +59,9 @@ Stroy.kg — это веб-платформа (PWA-ready), которая свя
 ### 1.4 Ссылки на документы
 
 - IEEE 29148-2011 — Systems and software engineering — Life cycle processes — Requirements engineering
-- Firebase Documentation — https://firebase.google.com/docs
+- Supabase Documentation — https://supabase.com/docs
 - Next.js 15 Documentation — https://nextjs.org/docs
-- SPEC.md — Спецификация Firebase Auth API
+- SPEC.md — Спецификация Supabase Auth API
 - RULES.md — Технический стек и архитектурные правила проекта
 
 ---
@@ -87,8 +87,8 @@ Stroy.kg — это B2B/B2C маркетплейс, ориентированны
 
 - **Клиент:** Современные браузеры (Chrome, Safari, Firefox, Edge). Mobile-first дизайн.
 - **Серверная часть:** Next.js 15 (App Router), серверные компоненты + клиентские компоненты.
-- **База данных:** Firebase Cloud Firestore.
-- **Аутентификация:** Firebase Auth (Phone, Email).
+- **База данных:** Supabase (PostgreSQL).
+- **Аутентификация:** Supabase Auth (Phone, Email).
 - **Хостинг:** Vercel (рекомендуется) / любой Node.js хост.
 
 ### 2.4 Ограничения дизайна
@@ -116,10 +116,10 @@ Stroy.kg — это B2B/B2C маркетплейс, ориентированны
 │              Клиентские компоненты               │
 │   AuthProvider, Header, Navigation, Modals      │
 ├─────────────────────────────────────────────────┤
-│                    Firebase SDK                  │
+│                    Supabase SDK                  │
 │   ┌──────────────┐    ┌─────────────────────┐   │
-│   │ Firebase Auth │    │ Cloud Firestore     │   │
-│   │ (Phone/Email) │    │ (NoSQL Database)    │   │
+│   │ Supabase Auth │    │ PostgreSQL (Supabase) │   │
+│   │ (Phone/Email) │    │ (SQL Database)        │   │
 │   └──────────────┘    └─────────────────────┘   │
 └─────────────────────────────────────────────────┘
 ```
@@ -160,8 +160,8 @@ Stroy.kg/
 | Язык | TypeScript | 5.x |
 | Стилизация | Tailwind CSS | 4.x |
 | UI-иконки | lucide-react | latest |
-| Аутентификация | Firebase Auth | 10.x |
-| База данных | Cloud Firestore | 10.x |
+| Аутентификация | Supabase Auth | 2.x |
+| База данных | Supabase PostgreSQL | — |
 | Менеджер пакетов | npm | 10.x |
 | Сборка | Next.js (standalone) | — |
 
@@ -171,35 +171,31 @@ Stroy.kg/
 
 ### 4.1 Модуль аутентификации (FR-AUTH)
 
-#### FR-AUTH-01: Регистрация и вход по телефону
+#### FR-AUTH-01: Регистрация и вход по email и паролю
 - **Приоритет:** Высокий
-- **Описание:** Пользователь вводит номер телефона в формате +996XXXXXXXXX. Firebase Auth отправляет 6-значный SMS-код (OTP).
-- **Входные данные:** Номер телефона (+996), чекбокс согласия с офертой
+- **Описание:** Пользователь вводит email и пароль. Supabase Auth аутентифицирует через `signInWithPassword`. При ошибке — автоматический `signUp`.
+- **Входные данные:** Email, пароль, роль (при регистрации)
 - **Процесс:**
-  1. Пользователь вводит номер телефона
-  2. Отмечает чекбокс "Согласие с офертой" (обязателен)
-  3. Нажимает "Отправить код"
-  4. Firebase отправляет SMS с 6-значным OTP
-  5. Пользователь вводит полученный код
-  6. При верном коде — аутентификация
-  7. Если пользователь новый — выбор роли (Consumer/Supplier/Developer)
-- **Выходные данные:** Аутентифицированная сессия (Firebase JWT)
-- **Ограничения:** Таймер обратного отсчёта 300 секунд для повторной отправки OTP
+  1. Пользователь вводит email и пароль
+  2. (Опционально) Отмечает «Я новый пользователь» и выбирает роль (Consumer/Supplier)
+  3. Нажимает «Войти»
+  4. `signInWithPassword({ email, password })` — если успех, сессия создана
+  5. Если ошибка `Invalid login credentials` — `signUp({ email, password, options: { data: { role } } })`
+  6. Триггер `handle_new_user()` создаёт профиль в `profiles`
+- **Выходные данные:** Аутентифицированная сессия (Supabase JWT)
 
-#### FR-AUTH-02: Вход по Email
-- **Приоритет:** Средний
-- **Описание:** Альтернативный способ входа для пользователей с подтверждённым email.
-- **Процесс:** Ввод email → OTP на почту → Верификация кода
-- **Ограничения:** Только для существующих пользователей
+#### FR-AUTH-02: Вход по телефону (заглушка)
+- **Приоритет:** Низкий
+- **Описание:** Вход по номеру телефона оставлен как stub для будущей реализации. В Supabase-режиме возвращает ошибку. В mock-режиме работает по-прежнему.
 
 #### FR-AUTH-03: Вход администратора
 - **Приоритет:** Высокий
-- **Описание:** При вводе специального номера (+996555000000) система запрашивает пароль вместо OTP.
-- **Процесс:** Ввод спецномера → Ввод пароля → Верификация → Вход в панель администратора
+- **Описание:** Администратор входит стандартным путём через email (`admin@stroy.kg`) и пароль (`admin123` для Supabase, `admin` для mock).
+- **Процесс:** Ввод email + пароль → `signInWithPassword` → Вход в панель администратора
 
 #### FR-AUTH-04: Управление сессией
 - **Приоритет:** Высокий
-- **Описание:** Сессии управляются Firebase Auth (JWT refresh). Данные пользователя сохраняются в localStorage.
+- **Описание:** Сессии управляются Supabase Auth (JWT refresh). Данные пользователя сохраняются в localStorage.
 - **Требования:**
   - Автоматическое восстановление сессии при перезагрузке
   - Кнопка выхода с полной очисткой состояния
@@ -211,9 +207,14 @@ Stroy.kg/
 - **Ограничения:** Роль нельзя изменить после выбора (только через админ-панель).
 
 #### FR-AUTH-06: Смена номера телефона
+- **Приоритет:** Низкий
+- **Описание:** Смена телефона — заглушка (stub). Реализация через `updateUser` запланирована в будущих фазах.
+
+#### FR-AUTH-07: Генерация демо-данных (админ)
 - **Приоритет:** Средний
-- **Описание:** Пользователь может изменить привязанный номер через `PhoneAuthProvider.credential` + `updatePhoneNumber`.
-- **Процесс:** Профиль → "Изменить номер" → Ввод нового номера → OTP → Подтверждение
+- **Описание:** Администратор может сгенерировать демо-данные через вкладку «Демо-данные» в панели `/admin`.
+- **Mock-режим:** Кнопка `resetMockData()` сбрасывает все in-memory хранилища.
+- **Supabase-режим:** Инфо-панель с описанием SQL-скриптов (`migration.sql`, `seed-data.sql`, `cleanup.sql`).
 
 ---
 
@@ -494,10 +495,10 @@ OPEN → ASSIGNED → IN_PROGRESS → COMPLETED
 
 | ID | Требование |
 |----|-----------|
-| NFR-SEC-01 | Аутентификация через Firebase Auth с JWT-токенами |
-| NFR-SEC-02 | Firestore Security Rules для контроля доступа к данным |
+| NFR-SEC-01 | Аутентификация через Supabase Auth с JWT-токенами |
+| NFR-SEC-02 | Supabase RLS (Row Level Security) для контроля доступа к данным |
 | NFR-SEC-03 | Защита от XSS (React DOM escaping + Content Security Policy) |
-| NFR-SEC-04 | Защита от CSRF (Firebase Auth + SameSite cookies) |
+| NFR-SEC-04 | Защита от CSRF (Supabase Auth + SameSite cookies) |
 | NFR-SEC-05 | Валидация входных данных на клиенте и сервере |
 | NFR-SEC-06 | RecaptchaVerifier для защиты от SMS-бомбинга при аутентификации |
 | NFR-SEC-07 | Ролевой контроль доступа (RBAC) — проверка роли на каждом защищённом маршруте |
@@ -526,10 +527,10 @@ OPEN → ASSIGNED → IN_PROGRESS → COMPLETED
 
 | ID | Требование |
 |----|-----------|
-| NFR-SCALE-01 | Firestore — автомасштабирование базы данных |
+| NFR-SCALE-01 | Supabase PostgreSQL — горизонтальное масштабирование базы данных |
 | NFR-SCALE-02 | CDN для статических ресурсов (Vercel Edge Network) |
 | NFR-SCALE-03 | Серверные компоненты Next.js для снижения клиентской нагрузки |
-| NFR-SCALE-04 | Поддержка > 10 000 одновременных пользователей (Firebase tier) |
+| NFR-SCALE-04 | Поддержка > 10 000 одновременных пользователей (Supabase tier) |
 
 ### 5.6 Совместимость (NFR-COMPAT)
 
@@ -753,30 +754,31 @@ OPEN → ASSIGNED → IN_PROGRESS → COMPLETED
 
 ## 8. Внешние интерфейсы
 
-### 8.1 Интерфейс Firebase Auth
+### 8.1 Интерфейс Supabase Auth
 
 | Метод | Описание |
 |-------|----------|
-| `signInWithPhoneNumber(phone, recaptcha)` | Отправка OTP по SMS |
-| `confirmationResult.confirm(code)` | Подтверждение OTP кода |
-| `PhoneAuthProvider.credential(verificationId, code)` | Создание credential для смены номера |
-| `updatePhoneNumber(user, credential)` | Обновление номера телефона |
-| `signOut()` | Выход из системы |
-| `RecaptchaVerifier` | Защита от SMS-бомбинга |
+| `supabase.auth.signInWithPassword({ email, password })` | Вход по email и паролю |
+| `supabase.auth.signUp({ email, password, options })` | Регистрация нового пользователя |
+| `supabase.auth.signOut()` | Выход из системы |
+| `supabase.auth.getUser()` | Получение текущего пользователя |
+| `supabase.auth.onAuthStateChange()` | Подписка на изменения сессии |
 
-### 8.2 Интерфейс Cloud Firestore
+### 8.2 Интерфейс Supabase PostgreSQL
 
-| Коллекция | Описание |
+| Таблица | Описание |
 |-----------|----------|
-| `users` | Профили пользователей |
+| `profiles` | Профили пользователей |
 | `products` | Товары и услуги |
 | `requests` | Заявки покупателей |
 | `chats` | Диалоги между пользователями |
+| `messages` | Сообщения в чатах |
 | `notifications` | Уведомления |
+| `nomenclature_groups` | Номенклатурные группы |
 
 ### 8.3 REST API (планируемый)
 
-В MVP используется прямое взаимодействие с Firestore через SDK. В будущем планируется REST API через Next.js API Routes.
+В MVP используется взаимодействие с Supabase через `@supabase/supabase-js` и `@supabase/ssr`. В будущем планируется REST API через Next.js API Routes.
 
 ### 8.4 Интерфейс пользователя (UI)
 
@@ -790,11 +792,11 @@ OPEN → ASSIGNED → IN_PROGRESS → COMPLETED
 
 ### 9.1 Ограничения
 
-1. **MVP-версия** — используется in-memory mock-база данных (mockDb.ts); переход на реальный Firestore запланирован
-2. **SMS-аутентификация** — ограничена бесплатным тарифом Firebase (10 SMS/мин по умолчанию)
+1. **MVP-версия** — используется in-memory mock-база данных (mockDb.ts); подключение Supabase реализовано через dual-mode флаг `USE_SUPABASE`
+2. **SMS-аутентификация** — ограничена бесплатным тарифом Supabase (10 SMS/мин по умолчанию)
 3. **Платежи** — не реализованы в MVP; подписки назначаются вручную
 4. **Файлы** — загрузка фото/документов не реализована (mock UI)
-5. **Реальное время** — чат работает через polling, а не через WebSocket/Firestore listeners
+5. **Реальное время** — чат работает через polling, в будущем — Supabase Realtime
 6. **Единственный язык** — русский (i18n не поддерживается в MVP)
 7. **Единственная валюта** — KGS (кыргызский сом)
 

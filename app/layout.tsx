@@ -9,8 +9,20 @@ const golos = Golos_Text({ subsets: ['latin', 'cyrillic'], variable: '--font-bod
 const unbounded = Unbounded({ subsets: ['latin', 'cyrillic'], variable: '--font-heading' });
 
 export const metadata: Metadata = {
-  title: 'Stroy.kg - Всё для стройки в одном месте',
-  description: 'Маркетплейс строительных услуг и материалов в Кыргызстане',
+  metadataBase: new URL('https://stroy.kg'),
+  title: {
+    default: 'Stroy.kg — Всё для стройки в одном месте',
+    template: '%s | Stroy.kg',
+  },
+  description: 'Маркетплейс строительных услуг и материалов в Кыргызстане. Найдите поставщиков, стройматериалы и услуги в Бишкеке.',
+  openGraph: {
+    type: 'website',
+    locale: 'ru_RU',
+    url: 'https://stroy.kg',
+    siteName: 'Stroy.kg',
+    title: 'Stroy.kg — Всё для стройки в одном месте',
+    description: 'Маркетплейс строительных услуг и материалов в Кыргызстане',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

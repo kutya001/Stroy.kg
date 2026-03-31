@@ -1,10 +1,12 @@
 'use client';
 
 import { Eye, MessageSquare, PackageCheck, Wallet, TrendingUp, Package, Plus, Settings, Crown, ArrowRight, BarChart3 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { getSupplierDashboard, getProductsBySupplierId, subscriptionPlans, getVerificationLabel, getVerificationColor, type DashboardMetrics, type MockProduct } from '@/lib/mockDb';
+import { getSupplierDashboard, getProductsBySupplierId } from '@/lib/data';
+import { subscriptionPlans, getVerificationLabel, getVerificationColor, type DashboardMetrics, type MockProduct } from '@/lib/mockDb';
 
 export default function DashboardPage() {
   const { userData, openAuthModal } = useAuth();
@@ -15,8 +17,13 @@ export default function DashboardPage() {
   useEffect(() => {
     setMounted(true);
     if (userData?.uid) {
-      setMetrics(getSupplierDashboard(userData.uid));
-      setProducts(getProductsBySupplierId(userData.uid));
+      Promise.all([
+        getSupplierDashboard(userData.uid),
+        getProductsBySupplierId(userData.uid),
+      ]).then(([m, p]) => {
+        setMetrics(m);
+        setProducts(p);
+      });
     }
   }, [userData]);
 
@@ -201,7 +208,7 @@ export default function DashboardPage() {
             {products.slice(0, 6).map(p => (
               <div key={p.id} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm flex items-start gap-4">
                 <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden relative shrink-0">
-                  <img src={p.image} alt={p.name} className="object-cover w-full h-full" />
+                  <Image src={p.image} alt={p.name} fill className="object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold text-sm text-secondary truncate">{p.name}</h4>

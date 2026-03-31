@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Star, BadgeCheck, MapPin, Package, Wrench, Megaphone, ShoppingCart, MessageSquare, Tag, Shield } from 'lucide-react';
-import { getMockUserById, getProductsBySupplierId, getVerificationLabel, getVerificationColor, type MockProduct } from '@/lib/mockDb';
+import { getProfileById, getProductsBySupplierId } from '@/lib/data';
+import { getVerificationLabel, getVerificationColor, type MockProduct } from '@/lib/mockDb';
 import { useAuth } from '@/components/AuthProvider';
 import { useState, useEffect, useMemo } from 'react';
 
@@ -12,17 +13,20 @@ export default function SupplierPage() {
   const params = useParams();
   const router = useRouter();
   const { userData, openAuthModal, canAccessChat } = useAuth();
-  const [supplier, setSupplier] = useState<ReturnType<typeof getMockUserById>>(null);
+  const [supplier, setSupplier] = useState<any>(null);
   const [products, setProducts] = useState<MockProduct[]>([]);
   const [catFilter, setCatFilter] = useState<'all' | 'Товар' | 'Услуга'>('all');
 
   useEffect(() => {
     const id = params.id as string;
-    const s = getMockUserById(id);
-    setSupplier(s);
-    if (s) {
-      setProducts(getProductsBySupplierId(s.uid).filter(p => p.isPublished));
-    }
+    getProfileById(id).then(s => {
+      setSupplier(s);
+      if (s) {
+        getProductsBySupplierId(s.uid).then(prods => 
+          setProducts(prods.filter(p => p.isPublished))
+        );
+      }
+    });
   }, [params.id]);
 
   const filtered = useMemo(() => {

@@ -11,8 +11,8 @@
 | Стилизация | Tailwind CSS 4 |
 | UI-иконки | lucide-react |
 | Анимации | motion (Framer Motion) |
-| Аутентификация | Firebase Auth (Phone/Email) |
-| База данных | Cloud Firestore (mock в MVP) |
+| Аутентификация | Supabase Auth (Phone/Email) |
+| База данных | Supabase PostgreSQL (mock в MVP) |
 | Шрифты | Unbounded (заголовки), Golos Text (основной) |
 
 ## Быстрый старт
@@ -36,7 +36,7 @@ npm run lint
 
 Приложение откроется на `http://localhost:3000`.
 
-> **Mock-режим:** В MVP все данные хранятся в `lib/mockDb.ts` (in-memory). Реальный Firebase подключается переключением `VERIFICATION_CONFIG.useMock = false`.
+> **Dual-mode:** В MVP все данные хранятся в `lib/mockDb.ts` (in-memory). При наличии env-переменных `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY` приложение автоматически переключается на Supabase.
 
 ## Структура проекта
 
@@ -78,7 +78,7 @@ Stroy.kg/
 ├── .github/instructions/       # Инструкции для Copilot (подробнее ниже)
 │
 ├── RULES.md                    # Технический стек и архитектурные правила
-├── SPEC.md                     # Спецификация Firebase Auth API и UI
+├── SPEC.md                     # Спецификация Supabase Auth API и UI
 └── plan.md                     # План разработки текущего модуля
 ```
 
@@ -163,7 +163,7 @@ Artifacts/
 | Файл | Назначение |
 |------|-----------|
 | `RULES.md` | Технический стек и архитектурные правила |
-| `SPEC.md` | Спецификация Firebase Auth API и UI |
+| `SPEC.md` | Спецификация Supabase Auth API и UI |
 | `plan.md` | План текущей фазы разработки |
 | `metadata.json` | Метаданные проекта |
 | `next.config.ts` | Конфигурация Next.js (standalone output) |

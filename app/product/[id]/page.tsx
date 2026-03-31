@@ -1,39 +1,57 @@
-'use client';
-
-import { useParams, useRouter } from 'next/navigation';
+import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, Star, BadgeCheck, MapPin, MessageSquare, ShoppingCart, Megaphone, Package, Tag, Phone, ChevronRight } from 'lucide-react';
-import { getProductById, getProductsBySupplierId, type MockProduct } from '@/lib/mockDb';
-import { useAuth } from '@/components/AuthProvider';
-import { useState, useEffect } from 'react';
+import { ArrowLeft, Star, BadgeCheck, MapPin, Megaphone, Package, Tag, ChevronRight } from 'lucide-react';
+import { getProductById as getProductByIdMock, getProductsBySupplierId as getProductsBySupplierIdMock } from '@/lib/mockDb';
+import { createClient } from '@/lib/supabase/server';
+import { getProductById as getProductByIdDb, getProductsBySupplierId as getProductsBySupplierIdDb } from '@/lib/queries';
+import ProductActions from './ProductActions';
 
-export default function ProductDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const { userData, openAuthModal, canAccessChat } = useAuth();
-  const [product, setProduct] = useState<MockProduct | null>(null);
-  const [otherProducts, setOtherProducts] = useState<MockProduct[]>([]);
+const USE_SUPABASE = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-  useEffect(() => {
-    const id = params.id as string;
-    const p = getProductById(id);
-    setProduct(p);
-    if (p) {
-      const others = getProductsBySupplierId(p.supplierId)
-        .filter(op => op.id !== p.id && op.isPublished)
-        .slice(0, 3);
-      setOtherProducts(others);
-    }
-  }, [params.id]);
+async function fetchProduct(id: string) {
+  if (USE_SUPABASE) {
+    const supabase = await createClient();
+    return getProductByIdDb(supabase, id);
+  }
+  return getProductByIdMock(id);
+}
 
-  const handleChatClick = () => {
-    if (!userData) { openAuthModal(); return; }
-    if (!canAccessChat) {
-      alert('Чат доступен после верификации уровня 2. Заполните ИНН в профиле.');
-      return;
-    }
+async function fetchSupplierProducts(supplierId: string) {
+  if (USE_SUPABASE) {
+    const supabase = await createClient();
+    return getProductsBySupplierIdDb(supabase, supplierId);
+  }
+  return getProductsBySupplierIdMock(supplierId);
+}
+
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const product = await fetchProduct(id);
+
+  if (!product) return { title: 'Товар не найден | Stroy.kg' };
+
+  return {
+    title: `${product.name} купить в Бишкеке | Stroy.kg`,
+    description: `Закажите ${product.name} за ${product.price.toLocaleString()} KGS от ${product.supplierName}. ${product.description.substring(0, 120)}`,
+    openGraph: {
+      title: product.name,
+      description: product.description.substring(0, 200),
+      images: [product.image],
+    },
+    alternates: {
+      canonical: `https://stroy.kg/product/${product.id}`,
+    },
   };
+}
+
+export default async function ProductDetailPage({ params }: Props) {
+  const { id } = await params;
+  const product = await fetchProduct(id);
 
   if (!product) {
     return (
@@ -46,26 +64,74 @@ export default function ProductDetailPage() {
     );
   }
 
+  const allSupplierProducts = await fetchSupplierProducts(product.supplierId);
+  const otherProducts = allSupplierProducts
+    .filter(op => op.id !== product.id && op.isPublished)
+    .slice(0, 3);
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    image: product.image,
+    description: product.description,
+    offers: {
+      '@type': 'Offer',
+      url: `https://stroy.kg/product/${product.id}`,
+      priceCurrency: 'KGS',
+      price: product.price,
+      itemCondition: 'https://schema.org/NewCondition',
+      availability: 'https://schema.org/InStock',
+      seller: {
+        '@type': 'Organization',
+        name: product.supplierName,
+      },
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: product.rating,
+      reviewCount: 10,
+    },
+  };
+
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Каталог', item: 'https://stroy.kg/catalog' },
+      { '@type': 'ListItem', position: 2, name: product.nomenclatureCategory, item: `https://stroy.kg/catalog?category=${encodeURIComponent(product.nomenclatureCategory)}` },
+      { '@type': 'ListItem', position: 3, name: product.nomenclatureType },
+      { '@type': 'ListItem', position: 4, name: product.name },
+    ],
+  };
+
   return (
     <main className="max-w-5xl mx-auto px-4 pb-24 pt-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, '\\u003c') }}
+      />
+
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-        <button onClick={() => router.back()} className="flex items-center gap-1 text-primary hover:underline font-medium">
-          <ArrowLeft className="w-4 h-4" /> Назад
-        </button>
-        <ChevronRight className="w-3 h-3" />
-        <Link href="/catalog" className="hover:text-primary">Каталог</Link>
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 mb-6">
+        <Link href="/catalog" className="flex items-center gap-1 text-primary hover:underline font-medium">
+          <ArrowLeft className="w-4 h-4" /> Каталог
+        </Link>
         <ChevronRight className="w-3 h-3" />
         <span className="text-slate-400">{product.nomenclatureCategory}</span>
         <ChevronRight className="w-3 h-3" />
         <span className="text-slate-400">{product.nomenclatureType}</span>
-      </div>
+      </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
         {/* Image + Badges */}
         <div className="lg:col-span-3">
           <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-slate-100 mb-4">
-            <Image src={product.image} alt={product.name} fill className="object-cover" />
+            <Image src={product.image} alt={product.name} fill priority className="object-cover" />
             <div className="absolute top-4 left-4 flex flex-col gap-2">
               {product.isPromoted && (
                 <span className="px-3 py-1 bg-accent text-secondary text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm">
@@ -144,21 +210,8 @@ export default function ProductDetailPage() {
               ))}
             </div>
 
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Link href={`/create?productId=${product.id}`} className="w-full bg-primary text-white h-12 rounded-xl text-sm font-bold hover:bg-primary-dark active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                <ShoppingCart className="w-5 h-5" /> Оставить заявку на этот товар
-              </Link>
-              <button
-                onClick={handleChatClick}
-                className="w-full border border-primary text-primary h-12 rounded-xl text-sm font-bold hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
-              >
-                <MessageSquare className="w-5 h-5" /> Написать продавцу
-              </button>
-              <a href={`tel:+996555111111`} className="w-full border border-slate-200 text-slate-700 h-12 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                <Phone className="w-5 h-5" /> Позвонить
-              </a>
-            </div>
+            {/* Action Buttons (Client Component) */}
+            <ProductActions productId={product.id} />
           </div>
 
           {/* Supplier Card */}

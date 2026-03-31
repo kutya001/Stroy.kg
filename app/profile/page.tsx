@@ -2,8 +2,9 @@
 import { Settings, Bell, Shield, CircleHelp, LogOut, ChevronRight, Star, Package, MapPin, Building2, LogIn, Phone, FileText, CheckCircle2, Edit3, Mail, BadgeCheck, Crown, CreditCard, ArrowUpRight, BarChart3, Loader2, X, Lock, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
-import { useState } from 'react';
-import { getVerificationLabel, getVerificationColor, subscriptionPlans, type VerificationLevel, VERIFICATION_CONFIG, sendEmailVerification, verifyEmail, submitInnVerification, submitLicenseVerification } from '@/lib/mockDb';
+import { useState, useEffect } from 'react';
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/lib/data';
+import { getVerificationLabel, getVerificationColor, subscriptionPlans, type VerificationLevel, VERIFICATION_CONFIG, sendEmailVerification, verifyEmail, submitInnVerification, submitLicenseVerification, type MockNotification } from '@/lib/mockDb';
 import ChangePhoneModal from '@/components/ChangePhoneModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import ProfileEditor from '@/components/ProfileEditor';
@@ -15,6 +16,9 @@ export default function ProfilePage() {
   const [isChangingPhone, setIsChangingPhone] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<MockNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   // Verification flow state
   const [verifyStep, setVerifyStep] = useState<VerifyStep>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
@@ -23,6 +27,13 @@ export default function ProfilePage() {
   const [codeInput, setCodeInput] = useState('');
   const [innInput, setInnInput] = useState('');
   const [licenseInput, setLicenseInput] = useState('');
+
+  // Load unread count on mount
+  useEffect(() => {
+    if (user) {
+      getNotifications(user.uid).then(n => setUnreadCount(n.filter(x => !x.read).length));
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -106,6 +117,33 @@ export default function ProfilePage() {
   const verLevel = (userData?.verificationLevel ?? 0) as VerificationLevel;
   const currentPlan = subscriptionPlans.find(p => p.tier === (userData?.subscription || 'FREE'));
   const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
+
+  const openNotifications = () => {
+    if (user) {
+      getNotifications(user.uid).then(n => {
+        setNotifications(n);
+        setShowNotifications(true);
+      });
+    }
+  };
+
+  const handleMarkRead = async (id: string) => {
+    await markNotificationRead(id);
+    if (user) {
+      const n = await getNotifications(user.uid);
+      setNotifications(n);
+      setUnreadCount(n.filter(x => !x.read).length);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (user) {
+      await markAllNotificationsRead(user.uid);
+      const n = await getNotifications(user.uid);
+      setNotifications(n);
+      setUnreadCount(0);
+    }
+  };
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-6 pb-24 space-y-6">
@@ -202,7 +240,9 @@ export default function ProfilePage() {
           <div className={`p-3 rounded-xl border ${verLevel >= 3 ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-slate-100'}`}>
             <BadgeCheck className="w-4 h-4 mb-1" /> <span className="font-bold">Ур. 3</span>
             <p className="text-slate-500 mt-1">Лицензии</p>
-            {verLevel >= 3 ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" /> : (
+            {userData?.role === 'consumer' ? (
+              <p className="text-xs text-slate-400 mt-1">Недоступно для покупателей</p>
+            ) : verLevel >= 3 ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" /> : (
               <button onClick={() => { setVerifyStep('license'); setVerifyError(''); }} className="text-primary font-bold mt-1 hover:underline">Заполнить</button>
             )}
           </div>
@@ -345,7 +385,7 @@ export default function ProfilePage() {
 
       {/* Menu */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-colors">
+        <Link href="/create" className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-colors">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
               <Package className="w-5 h-5" />
@@ -353,7 +393,7 @@ export default function ProfilePage() {
             <span className="font-medium text-secondary">Мои заказы и отклики</span>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-400" />
-        </div>
+        </Link>
         
         {/* Phone Number Change */}
         <div 
@@ -399,10 +439,18 @@ export default function ProfilePage() {
           <ChevronRight className="w-5 h-5 text-slate-400" />
         </div>
 
-        <div className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-colors">
+        <div
+          onClick={openNotifications}
+          className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-colors"
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 relative">
               <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </div>
             <span className="font-medium text-secondary">Уведомления</span>
           </div>
@@ -483,6 +531,49 @@ export default function ProfilePage() {
 
       <ChangePhoneModal isOpen={isChangingPhone} onClose={() => setIsChangingPhone(false)} />
       <ChangePasswordModal isOpen={isChangingPassword} onClose={() => setIsChangingPassword(false)} />
+
+      {/* Notifications Modal */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] shadow-xl relative flex flex-col">
+            <div className="flex items-center justify-between border-b p-4 sticky top-0 bg-white rounded-t-2xl z-10">
+              <h4 className="font-heading font-bold text-lg text-secondary">Уведомления</h4>
+              <div className="flex items-center gap-2">
+                {notifications.some(n => !n.read) && (
+                  <button onClick={handleMarkAllRead} className="text-xs text-primary font-bold hover:underline">Прочитать все</button>
+                )}
+                <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {notifications.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  <Bell className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+                  <p>Нет уведомлений</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {notifications.map(n => (
+                    <div
+                      key={n.id}
+                      onClick={() => handleMarkRead(n.id)}
+                      className={`p-4 cursor-pointer hover:bg-slate-50 transition-colors ${!n.read ? 'bg-primary/5' : ''}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${!n.read ? 'bg-primary' : 'bg-transparent'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm ${!n.read ? 'font-semibold text-secondary' : 'text-slate-600'}`}>{n.text}</p>
+                          <p className="text-xs text-slate-400 mt-1">{new Date(n.date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       
       {isEditingProfile && (
         <ProfileEditor 

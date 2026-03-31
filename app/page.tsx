@@ -3,7 +3,8 @@
 import Image from 'next/image';
 import { MapPin, ArrowRight, CheckCircle2, Plus, Search, PackagePlus, Store, Package, Wrench, BarChart3, Shield, Star, BadgeCheck, Megaphone, ShoppingCart, Tag, Newspaper, TrendingUp, Users, FileText, Sparkles, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { getAllMockRequests, getAllMockProducts, getVerificationLabel, getVerificationColor, type NomenclatureCategory } from '@/lib/mockDb';
+import { getAllRequests, getAllProducts } from '@/lib/data';
+import { getVerificationLabel, getVerificationColor, type NomenclatureCategory, type MockRequest, type MockProduct } from '@/lib/mockDb';
 import { useAuth } from '@/components/AuthProvider';
 import { useEffect, useState, useMemo } from 'react';
 
@@ -15,15 +16,19 @@ const mockNews = [
 ];
 
 export default function FeedPage() {
-  const requests = getAllMockRequests();
-  const allProducts = getAllMockProducts(true);
   const { userData, canAccessRequests } = useAuth();
   const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
   const [mounted, setMounted] = useState(false);
   const [feedFilter, setFeedFilter] = useState<'all' | 'Товар' | 'Услуга'>('all');
+  const [requests, setRequests] = useState<MockRequest[]>([]);
+  const [allProducts, setAllProducts] = useState<MockProduct[]>([]);
 
   useEffect(() => {
     setMounted(true);
+    Promise.all([getAllRequests(), getAllProducts(true)]).then(([r, p]) => {
+      setRequests(r);
+      setAllProducts(p);
+    });
   }, []);
 
   // Buyer feed: products sorted by promoted first

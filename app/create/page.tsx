@@ -1,11 +1,12 @@
 'use client';
 
-import { Building2, Wrench, Truck, Layers, Wallet, Camera, Clock, Shield, XCircle, CheckCircle2, ArrowRight, Package, ChevronDown, ChevronRight, Lightbulb, Search } from 'lucide-react';
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { Building2, Wrench, Truck, Layers, Wallet, Camera, Clock, Shield, XCircle, CheckCircle2, ArrowRight, Package, ChevronDown, ChevronRight, Lightbulb, Search, Pencil } from 'lucide-react';
+import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { createMockRequest, getMockRequestsByAuthor, getMockRequestsForSupplier, updateRequestStatus, getStatusLabel, getStatusColor, getProductById, nomenclatureGroups, type NomenclatureCategory, type NomenclatureType, type RequestStatus } from '@/lib/mockDb';
+import { createRequest, updateRequest, getRequestById, getRequestsByAuthor, getRequestsForSupplier, updateRequestStatus, getProductById } from '@/lib/data';
+import { getStatusLabel, getStatusColor, nomenclatureGroups, type NomenclatureCategory, type NomenclatureType, type RequestStatus } from '@/lib/mockDb';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function CreatePage() {
   return (
@@ -18,6 +19,7 @@ export default function CreatePage() {
 function CreatePageInner() {
   const { user, userData, canAccessRequests, openAuthModal } = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const isSupplier = userData?.role === 'supplier' || userData?.role === 'developer';
   const [category, setCategory] = useState<NomenclatureCategory>('Товар');
   const [title, setTitle] = useState('');
@@ -29,6 +31,7 @@ function CreatePageInner() {
   const [supplierRequests, setSupplierRequests] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'create' | 'my'>('create');
+  const [editId, setEditId] = useState<string | null>(null);
 
   // Clarification fields (nomenclature)
   const [showClarifications, setShowClarifications] = useState(false);
@@ -38,21 +41,47 @@ function CreatePageInner() {
   const [linkedProductId, setLinkedProductId] = useState<string | undefined>(undefined);
 
   // Pre-fill from product
+  // Pre-fill from product OR edit existing request
   useEffect(() => {
+    const editRequestId = searchParams.get('editId');
+    if (editRequestId) {
+      getRequestById(editRequestId).then(existing => {
+        if (existing && existing.status === 'OPEN') {
+          setEditId(editRequestId);
+          setCategory(existing.category);
+          setTitle(existing.title);
+          setQuantity(String(existing.quantity));
+          setUnit(existing.unit);
+          setBudget(String(existing.budget));
+          setDescription(existing.description);
+          setNomType(existing.type || '');
+          setGroupId(existing.groupId || '');
+          setCharValues(existing.characteristics || {});
+          setLinkedProductId(existing.linkedProductId);
+          if (existing.type || existing.groupId || (existing.characteristics && Object.keys(existing.characteristics).length > 0)) {
+            setShowClarifications(true);
+          }
+          setActiveTab('create');
+        }
+      });
+      return;
+    }
+
     const productId = searchParams.get('productId');
     if (productId) {
-      const product = getProductById(productId);
-      if (product) {
-        setCategory(product.nomenclatureCategory);
-        setTitle(product.name);
-        setDescription(`Заявка на товар: ${product.name} (${product.supplierName}). ${product.description}`);
-        setUnit(product.unit);
-        setNomType(product.nomenclatureType);
-        setGroupId(product.groupId);
-        setCharValues(product.characteristics || {});
-        setLinkedProductId(product.id);
-        setShowClarifications(true);
-      }
+      getProductById(productId).then(product => {
+        if (product) {
+          setCategory(product.nomenclatureCategory);
+          setTitle(product.name);
+          setDescription(`Заявка на товар: ${product.name} (${product.supplierName}). ${product.description}`);
+          setUnit(product.unit);
+          setNomType(product.nomenclatureType);
+          setGroupId(product.groupId);
+          setCharValues(product.characteristics || {});
+          setLinkedProductId(product.id);
+          setShowClarifications(true);
+        }
+      });
     }
   }, [searchParams]);
 
@@ -76,9 +105,9 @@ function CreatePageInner() {
     setMounted(true);
     if (user) {
       if (isSupplier) {
-        setSupplierRequests(getMockRequestsForSupplier());
+        getRequestsForSupplier().then(setSupplierRequests);
       } else {
-        setMyRequests(getMockRequestsByAuthor(user.uid));
+        getRequestsByAuthor(user.uid).then(setMyRequests);
       }
     }
   }, [user, isSupplier]);
@@ -107,16 +136,14 @@ function CreatePageInner() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !quantity || !description) {
       alert('Заполните обязательные поля');
       return;
     }
 
-    const newReq = createMockRequest({
-      authorId: user.uid,
-      authorName: userData?.name || 'Пользователь',
+    const requestData = {
       title,
       category,
       type: nomType || undefined,
@@ -128,23 +155,60 @@ function CreatePageInner() {
       budget: Number(budget) || 0,
       quantity: Number(quantity),
       unit,
-      region: 'Бишкек',
-    });
+      region: 'Бишкек' as const,
+    };
 
-    setMyRequests([newReq, ...myRequests]);
+    if (editId) {
+      const updated = await updateRequest(editId, requestData);
+      if (updated) {
+        const reqs = await getRequestsByAuthor(user.uid);
+        setMyRequests(reqs);
+        setEditId(null);
+        router.replace('/create');
+        setActiveTab('my');
+      }
+    } else {
+      const newReq = await createRequest({
+        authorId: user.uid,
+        authorName: userData?.name || 'Пользователь',
+        ...requestData,
+      });
+      if (newReq) setMyRequests([newReq, ...myRequests]);
+    }
+
     setTitle('');
     setQuantity('');
     setBudget('');
     setDescription('');
+    setNomType('');
+    setGroupId('');
+    setCharValues({});
+    setLinkedProductId(undefined);
+    setShowClarifications(false);
     setActiveTab('my');
   };
 
-  const handleStatusChange = (reqId: string, newStatus: RequestStatus) => {
-    updateRequestStatus(reqId, newStatus, isSupplier ? user.uid : undefined, isSupplier ? userData?.name : undefined);
+  const handleCancelEdit = () => {
+    setEditId(null);
+    setTitle('');
+    setQuantity('');
+    setBudget('');
+    setDescription('');
+    setCategory('Товар');
+    setNomType('');
+    setGroupId('');
+    setCharValues({});
+    setLinkedProductId(undefined);
+    setShowClarifications(false);
+    router.replace('/create');
+  };
+
+  const handleStatusChange = async (reqId: string, newStatus: RequestStatus) => {
+    await updateRequestStatus(reqId, newStatus, isSupplier ? user.uid : undefined, isSupplier ? userData?.name : undefined);
     if (isSupplier) {
-      setSupplierRequests(getMockRequestsForSupplier());
+      setSupplierRequests(await getRequestsForSupplier());
     } else {
-      setMyRequests(getMockRequestsByAuthor(user.uid));
+      setMyRequests(await getRequestsByAuthor(user.uid));
     }
   };
 
@@ -234,8 +298,8 @@ function CreatePageInner() {
         {activeTab === 'create' ? (
           <>
             <div className="space-y-2">
-              <h1 className="text-3xl font-heading font-bold text-secondary">Создать заявку</h1>
-              <p className="text-slate-600">Опишите, что вам нужно, и поставщики откликнутся сами.</p>
+              <h1 className="text-3xl font-heading font-bold text-secondary">{editId ? 'Редактировать заявку' : 'Создать заявку'}</h1>
+              <p className="text-slate-600">{editId ? 'Внесите изменения и сохраните.' : 'Опишите, что вам нужно, и поставщики откликнутся сами.'}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
@@ -386,8 +450,13 @@ function CreatePageInner() {
                 </div>
 
                 <button type="submit" className="w-full bg-primary text-white font-heading font-bold py-4 rounded-xl shadow-lg shadow-primary/20 hover:bg-primary-dark active:scale-95 transition-all">
-                  Опубликовать заявку
+                  {editId ? 'Сохранить изменения' : 'Опубликовать заявку'}
                 </button>
+                {editId && (
+                  <button type="button" onClick={handleCancelEdit} className="w-full text-slate-500 font-medium py-3 rounded-xl hover:bg-slate-50 transition-all">
+                    Отменить редактирование
+                  </button>
+                )}
               </div>
             </form>
           </>
@@ -415,15 +484,25 @@ function CreatePageInner() {
                     <span className="flex items-center gap-1"><Layers className="w-4 h-4" /> {req.quantity} {req.unit}</span>
                     <span className="flex items-center gap-1"><Wallet className="w-4 h-4" /> {req.budget.toLocaleString()} KGS</span>
                   </div>
-                  {/* Buyer can cancel if not yet completed */}
-                  {req.status !== 'COMPLETED' && req.status !== 'REJECTED' && (
-                    <button 
-                      onClick={() => handleStatusChange(req.id, 'REJECTED')} 
-                      className="text-sm text-danger font-medium hover:underline flex items-center gap-1"
-                    >
-                      <XCircle className="w-4 h-4" /> Отменить заявку
-                    </button>
-                  )}
+                  {/* Buyer actions for OPEN requests */}
+                  <div className="flex flex-wrap gap-3">
+                    {req.status === 'OPEN' && (
+                      <Link 
+                        href={`/create?editId=${req.id}`}
+                        className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+                      >
+                        <Pencil className="w-4 h-4" /> Редактировать
+                      </Link>
+                    )}
+                    {req.status !== 'COMPLETED' && req.status !== 'REJECTED' && (
+                      <button 
+                        onClick={() => handleStatusChange(req.id, 'REJECTED')} 
+                        className="text-sm text-danger font-medium hover:underline flex items-center gap-1"
+                      >
+                        <XCircle className="w-4 h-4" /> Отменить заявку
+                      </button>
+                    )}
+                  </div>
                   {req.assignedSupplierName && (
                     <p className="text-xs text-slate-500 mt-2">
                       Исполнитель: <span className="font-semibold text-secondary">{req.assignedSupplierName}</span>
