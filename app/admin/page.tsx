@@ -10,10 +10,11 @@ import {
   getAllConstructionStages, addConstructionStage, removeConstructionStage, updateConstructionStage,
   getAllMockRequests, getProductsBySupplierId as getProductsBySupplierIdSync, type RequestStatus, resetMockData,
 } from '@/lib/mockDb';
-import { Loader2, ShieldAlert, BadgeCheck, Users, ArrowUp, Eye, BookOpen, BarChart3, Plus, Pencil, Trash2, X, Save, Database, RefreshCw, Search, ChevronLeft, Lock, Mail, Phone, Building2, MapPin, Star, Package, Shield } from 'lucide-react';
+import { Loader2, ShieldAlert, BadgeCheck, Users, ArrowUp, Eye, BookOpen, BarChart3, Plus, Pencil, Trash2, X, Save, Database, RefreshCw, Search, ChevronLeft, Lock, Mail, Phone, Building2, MapPin, Star, Package, Shield, Table2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import DatabaseTab from './DatabaseTab';
 
-type AdminTab = 'users' | 'directories' | 'analytics' | 'demo';
+type AdminTab = 'users' | 'directories' | 'analytics' | 'database' | 'demo';
 
 export default function AdminPage() {
   const { user, userData, loading: authLoading, isAdminMode, adminViewAs, setAdminViewAs } = useAuth();
@@ -122,6 +123,9 @@ export default function AdminPage() {
         <button onClick={() => setActiveTab('analytics')} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'analytics' ? 'bg-primary text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
           <BarChart3 className="w-4 h-4" /> Аналитика
         </button>
+        <button onClick={() => setActiveTab('database')} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'database' ? 'bg-primary text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+          <Table2 className="w-4 h-4" /> База данных
+        </button>
         <button onClick={() => setActiveTab('demo')} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'demo' ? 'bg-primary text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
           <Database className="w-4 h-4" /> Демо-данные
         </button>
@@ -131,6 +135,7 @@ export default function AdminPage() {
       {activeTab === 'users' && <UsersTab allUsers={allUsers} pendingUsers={pendingUsers} verifiedUsers={verifiedUsers} onVerificationUp={handleVerificationUp} onUsersChanged={loadUsers} />}
       {activeTab === 'directories' && <DirectoriesTab />}
       {activeTab === 'analytics' && <AnalyticsTab allUsers={allUsers} />}
+      {activeTab === 'database' && <DatabaseTab />}
       {activeTab === 'demo' && <DemoTab onDataReset={loadUsers} />}
     </main>
   );
