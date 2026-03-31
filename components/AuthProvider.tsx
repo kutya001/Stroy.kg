@@ -10,6 +10,7 @@ import {
   type MockUser,
   type UserRole,
 } from '@/lib/mockDb';
+import { getProfileByPhone } from '@/lib/data';
 import AuthModal from './AuthModal';
 import OnboardingModal from './OnboardingModal';
 
@@ -64,6 +65,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
         setUserData(parsedUser);
+        // Re-resolve data-layer UID in case it was stored with a stale ID
+        resolveDataLayerUser(parsedUser).then(resolved => {
+          if (resolved.uid !== parsedUser.uid) {
+            setUser(resolved);
+            setUserData(resolved);
+            localStorage.setItem('mockUser', JSON.stringify(resolved));
+          }
+        });
         if (!parsedUser.onboardingCompleted) {
           setIsOnboardingModalOpen(true);
         }
@@ -83,6 +92,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const openAuthModal = () => setIsAuthModalOpen(true);
 
+  // Resolve data-layer UID (handles mock UID vs Supabase UUID mismatch)
+  const resolveDataLayerUser = async (mockUser: MockUser): Promise<MockUser> => {
+    try {
+      const dataProfile = await getProfileByPhone(mockUser.phone);
+      if (dataProfile && dataProfile.uid !== mockUser.uid) {
+        return { ...mockUser, uid: dataProfile.uid };
+      }
+    } catch { /* fallback to mock user */ }
+    return mockUser;
+  };
+
   const loginWithPhone = async (phone: string, role: UserRole = 'consumer') => {
     setLoading(true);
     try {
@@ -90,10 +110,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!existingUser) {
         existingUser = createMockUser(phone, role);
       }
-      setUser(existingUser);
-      setUserData(existingUser);
-      localStorage.setItem('mockUser', JSON.stringify(existingUser));
-      if (!existingUser.onboardingCompleted) {
+      const resolved = await resolveDataLayerUser(existingUser);
+      setUser(resolved);
+      setUserData(resolved);
+      localStorage.setItem('mockUser', JSON.stringify(resolved));
+      if (!resolved.onboardingCompleted) {
         setIsOnboardingModalOpen(true);
       }
       setIsAuthModalOpen(false);
@@ -109,9 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!existingUser) {
         throw new Error('Пользователь с такой почтой не найден');
       }
-      setUser(existingUser);
-      setUserData(existingUser);
-      localStorage.setItem('mockUser', JSON.stringify(existingUser));
+      const resolved = await resolveDataLayerUser(existingUser);
+      setUser(resolved);
+      setUserData(resolved);
+      localStorage.setItem('mockUser', JSON.stringify(resolved));
       setIsAuthModalOpen(false);
     } finally {
       setLoading(false);
@@ -125,9 +147,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!existingUser) {
         throw new Error('Неверный логин или пароль');
       }
-      setUser(existingUser);
-      setUserData(existingUser);
-      localStorage.setItem('mockUser', JSON.stringify(existingUser));
+      const resolved = await resolveDataLayerUser(existingUser);
+      setUser(resolved);
+      setUserData(resolved);
+      localStorage.setItem('mockUser', JSON.stringify(resolved));
       setIsAuthModalOpen(false);
     } finally {
       setLoading(false);

@@ -105,6 +105,11 @@ export async function getAllProfiles(): Promise<mock.MockUser[]> {
   return mock.getAllMockUsers()
 }
 
+export async function getProfileByPhone(phone: string): Promise<mock.MockUser | null> {
+  if (USE_SUPABASE) return db.getProfileByPhone(getClient(), phone)
+  return mock.getMockUser(phone) ?? null
+}
+
 export async function getProfileById(uid: string): Promise<mock.MockUser | null> {
   if (USE_SUPABASE) return db.getProfile(getClient(), uid)
   return mock.getMockUserById(uid) ?? null
