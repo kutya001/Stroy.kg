@@ -562,7 +562,7 @@ export default function DatabaseTab() {
       }
       const { data, error: err, count } = await query.limit(200);
       if (err) throw new Error(err.message);
-      setRows((data as Record<string, unknown>[]) ?? []);
+      setRows((data as unknown as Record<string, unknown>[]) ?? []);
       setTotalCount(count ?? 0);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
