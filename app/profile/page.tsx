@@ -1,5 +1,5 @@
 'use client';
-import { Settings, Bell, Shield, CircleHelp, LogOut, ChevronRight, Star, Package, MapPin, Building2, LogIn, Phone, FileText, CheckCircle2, Edit3, Mail, BadgeCheck, Crown, CreditCard, ArrowUpRight, BarChart3, Loader2, X } from 'lucide-react';
+import { Settings, Bell, Shield, CircleHelp, LogOut, ChevronRight, Star, Package, MapPin, Building2, LogIn, Phone, FileText, CheckCircle2, Edit3, Mail, BadgeCheck, Crown, CreditCard, ArrowUpRight, BarChart3, Loader2, X, Lock, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
 import { useState } from 'react';
@@ -425,6 +425,53 @@ export default function ProfilePage() {
             <span className="font-medium text-secondary">Помощь и поддержка</span>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-400" />
+        </div>
+      </div>
+
+      {/* Auth Preference Settings */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+        <h3 className="text-lg font-bold text-secondary flex items-center gap-2">
+          <KeyRound className="w-5 h-5 text-primary" /> Способ входа
+        </h3>
+        <p className="text-sm text-slate-500">Выберите предпочтительный способ входа в аккаунт</p>
+        <div className="space-y-3">
+          {([
+            { value: 'password' as const, icon: <Lock className="w-5 h-5" />, label: 'Только пароль', desc: 'Вход только по паролю' },
+            { value: 'otp' as const, icon: <Phone className="w-5 h-5" />, label: 'Только подтверждение (SMS/Email)', desc: 'Вход через код подтверждения' },
+            { value: 'both' as const, icon: <Shield className="w-5 h-5" />, label: 'Пароль или подтверждение', desc: 'Выбор способа при каждом входе' },
+          ]).map(option => (
+            <label
+              key={option.value}
+              className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                (userData?.authPreference || 'both') === option.value
+                  ? 'bg-primary/5 border-primary/30 shadow-sm'
+                  : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
+              }`}
+            >
+              <input
+                type="radio"
+                name="authPreference"
+                value={option.value}
+                checked={(userData?.authPreference || 'both') === option.value}
+                onChange={() => updateProfile({ authPreference: option.value })}
+                className="sr-only"
+              />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                (userData?.authPreference || 'both') === option.value
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-slate-200 text-slate-500'
+              }`}>
+                {option.icon}
+              </div>
+              <div className="flex-1">
+                <div className="font-medium text-secondary">{option.label}</div>
+                <div className="text-xs text-slate-500">{option.desc}</div>
+              </div>
+              {(userData?.authPreference || 'both') === option.value && (
+                <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+              )}
+            </label>
+          ))}
         </div>
       </div>
 

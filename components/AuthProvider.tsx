@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { getMockUser, getMockUserByEmail, createMockUser, updateMockUser, type MockUser, type UserRole, type VerificationLevel } from '@/lib/mockDb';
+import { getMockUser, getMockUserByEmail, getMockUserById, createMockUser, updateMockUser, authenticateWithPassword, type MockUser, type UserRole, type VerificationLevel } from '@/lib/mockDb';
 import AuthModal from './AuthModal';
 import OnboardingModal from './OnboardingModal';
 
@@ -10,8 +10,9 @@ interface AuthContextType {
   userData: MockUser | null;
   loading: boolean;
   openAuthModal: () => void;
-  loginWithPhone: (phone: string, role?: UserRole, password?: string) => Promise<void>;
+  loginWithPhone: (phone: string, role?: UserRole) => Promise<void>;
   loginWithEmail: (email: string) => Promise<void>;
+  loginWithPassword: (identifier: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<MockUser>) => Promise<void>;
   canAccessChat: boolean;
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   openAuthModal: () => {},
   loginWithPhone: async () => {},
   loginWithEmail: async () => {},
+  loginWithPassword: async () => {},
   logout: async () => {},
   updateProfile: async () => {},
   canAccessChat: false,
@@ -77,16 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const openAuthModal = () => setIsAuthModalOpen(true);
 
-  const loginWithPhone = async (phone: string, role: UserRole = 'consumer', password?: string) => {
+  const loginWithPhone = async (phone: string, role: UserRole = 'consumer') => {
     setLoading(true);
     try {
       let existingUser = getMockUser(phone);
-      
-      if (existingUser && existingUser.role === 'admin') {
-        if (existingUser.password !== password) {
-          throw new Error('Неверный пароль администратора');
-        }
-      }
 
       if (!existingUser) {
         existingUser = createMockUser(phone, role);
@@ -121,6 +117,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithPassword = async (identifier: string, password: string) => {
+    setLoading(true);
+    try {
+      const existingUser = authenticateWithPassword(identifier, password);
+      if (!existingUser) {
+        throw new Error('Неверный логин или пароль');
+      }
+      setUser(existingUser);
+      setUserData(existingUser);
+      localStorage.setItem('mockUser', JSON.stringify(existingUser));
+      setIsAuthModalOpen(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     setUser(null);
     setUserData(null);
@@ -145,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData: effectiveUserData, loading, openAuthModal, loginWithPhone, loginWithEmail, logout, updateProfile, canAccessChat, canAccessRequests, isAdminMode, adminViewAs, setAdminViewAs }}>
+    <AuthContext.Provider value={{ user, userData: effectiveUserData, loading, openAuthModal, loginWithPhone, loginWithEmail, loginWithPassword, logout, updateProfile, canAccessChat, canAccessRequests, isAdminMode, adminViewAs, setAdminViewAs }}>
       {children}
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       {user && (
