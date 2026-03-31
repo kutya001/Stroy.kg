@@ -49,7 +49,7 @@ function mapProfile(row: ProfileRow): MockUser {
     dailyAdBudget: row.daily_ad_budget,
     isPromoted: row.is_promoted,
     authPreference: row.auth_preference ?? undefined,
-    password: row.password ?? undefined,
+    password: (row as any).password ?? undefined,
   }
 }
 
@@ -122,24 +122,27 @@ function mapNotification(row: NotificationRow): MockNotification {
 // PROFILES (Users)
 // ============================================
 
+// All profile columns except 'password' (restricted by column-level grants)
+const PROFILE_COLUMNS = 'id, name, phone, email, role, onboarding_completed, created_at, verification_level, phone_verified, email_verified, inn, passport_scan, company_name, licenses, certificates, subscription, page_views, chat_requests, completed_orders, revenue, daily_ad_budget, is_promoted, auth_preference'
+
 export async function getProfile(supabase: Client, uid: string): Promise<MockUser | null> {
-  const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
-  return data ? mapProfile(data) : null
+  const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).single()
+  return data ? mapProfile(data as ProfileRow) : null
 }
 
 export async function getProfileByPhone(supabase: Client, phone: string): Promise<MockUser | null> {
-  const { data } = await supabase.from('profiles').select('*').eq('phone', phone).single()
-  return data ? mapProfile(data) : null
+  const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('phone', phone).single()
+  return data ? mapProfile(data as ProfileRow) : null
 }
 
 export async function getProfileByEmail(supabase: Client, email: string): Promise<MockUser | null> {
-  const { data } = await supabase.from('profiles').select('*').eq('email', email).single()
-  return data ? mapProfile(data) : null
+  const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('email', email).single()
+  return data ? mapProfile(data as ProfileRow) : null
 }
 
 export async function getAllProfiles(supabase: Client): Promise<MockUser[]> {
-  const { data } = await supabase.from('profiles').select('*')
-  return (data ?? []).map(mapProfile)
+  const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS)
+  return (data ?? []).map(r => mapProfile(r as ProfileRow))
 }
 
 export async function updateProfile(supabase: Client, uid: string, updates: Partial<MockUser>): Promise<MockUser | null> {
@@ -163,8 +166,8 @@ export async function updateProfile(supabase: Client, uid: string, updates: Part
   if (updates.authPreference !== undefined) dbUpdates.auth_preference = updates.authPreference as ProfileUpdate['auth_preference']
   if (updates.password !== undefined) dbUpdates.password = updates.password
 
-  const { data } = await supabase.from('profiles').update(dbUpdates).eq('id', uid).select().single()
-  return data ? mapProfile(data) : null
+  const { data } = await supabase.from('profiles').update(dbUpdates).eq('id', uid).select(PROFILE_COLUMNS).single()
+  return data ? mapProfile(data as ProfileRow) : null
 }
 
 // ============================================
