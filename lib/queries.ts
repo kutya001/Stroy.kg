@@ -19,6 +19,9 @@ type RequestRow = Database['public']['Tables']['requests']['Row']
 type NotificationRow = Database['public']['Tables']['notifications']['Row']
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUUID(v: unknown): v is string { return typeof v === 'string' && UUID_RE.test(v) }
+
 // ============================================
 // Маппинг snake_case → camelCase
 // (чтобы компоненты продолжали работать с существующими типами)
@@ -195,6 +198,10 @@ export async function getProductsBySupplierId(supabase: Client, supplierId: stri
 }
 
 export async function createProduct(supabase: Client, product: Partial<MockProduct>): Promise<MockProduct | null> {
+  if (!isUUID(product.supplierId)) {
+    console.error('[Supabase] createProduct: supplierId is not a valid UUID:', product.supplierId)
+    return null
+  }
   const { data, error } = await supabase.from('products').insert({
     supplier_id: product.supplierId!,
     supplier_name: product.supplierName ?? '',
@@ -261,6 +268,10 @@ export async function getRequestById(supabase: Client, id: string): Promise<Mock
 }
 
 export async function createRequest(supabase: Client, req: Partial<MockRequest>): Promise<MockRequest | null> {
+  if (!isUUID(req.authorId)) {
+    console.error('[Supabase] createRequest: authorId is not a valid UUID:', req.authorId)
+    return null
+  }
   const { data, error } = await supabase.from('requests').insert({
     author_id: req.authorId!,
     author_name: req.authorName ?? '',

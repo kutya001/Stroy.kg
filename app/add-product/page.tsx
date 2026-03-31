@@ -79,8 +79,9 @@ export default function AddProductPage() {
       return;
     }
 
+    const MAX_INT = 2_147_483_647;
     const group = nomenclatureGroups.find(g => g.id === groupId);
-    await createProduct({
+    const result = await createProduct({
       supplierId: user?.uid,
       supplierName: userData?.companyName || userData?.name || 'Поставщик',
       name,
@@ -89,7 +90,7 @@ export default function AddProductPage() {
       groupId,
       groupName: group?.name || '',
       description,
-      price: Number(price) || 0,
+      price: Math.min(Math.max(Math.round(Number(price) || 0), 0), MAX_INT),
       unit,
       region: 'Бишкек',
       characteristics: charValues,
@@ -100,6 +101,10 @@ export default function AddProductPage() {
       tags: [],
     });
 
+    if (!result) {
+      alert('Ошибка при создании товара. Попробуйте выйти и войти заново.');
+      return;
+    }
     router.push('/catalog');
   };
 

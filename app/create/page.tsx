@@ -143,6 +143,10 @@ function CreatePageInner() {
       return;
     }
 
+    const MAX_INT = 2_147_483_647;
+    const budgetNum = Math.min(Math.max(Math.round(Number(budget) || 0), 0), MAX_INT);
+    const quantityNum = Math.min(Math.max(Math.round(Number(quantity)), 0), MAX_INT);
+
     const requestData = {
       title,
       category,
@@ -152,8 +156,8 @@ function CreatePageInner() {
       characteristics: Object.keys(charValues).length > 0 ? charValues : undefined,
       linkedProductId,
       description,
-      budget: Number(budget) || 0,
-      quantity: Number(quantity),
+      budget: budgetNum,
+      quantity: quantityNum,
       unit,
       region: 'Бишкек' as const,
     };
@@ -173,7 +177,12 @@ function CreatePageInner() {
         authorName: userData?.name || 'Пользователь',
         ...requestData,
       });
-      if (newReq) setMyRequests([newReq, ...myRequests]);
+      if (newReq) {
+        setMyRequests([newReq, ...myRequests]);
+      } else {
+        alert('Ошибка при создании заявки. Попробуйте выйти и войти заново.');
+        return;
+      }
     }
 
     setTitle('');
